@@ -330,7 +330,7 @@ ospf_intra_add_router (struct route_table *rt, struct vertex *v,
     /* If the newly added vertex is an area border router or AS boundary
        router, a routing table entry is added whose destination type is
        "router".
-     * 如果新增加的顶点是一个区域边界路由器或者自治系统边界路由器，才会添加路由
+     * 如果新增加的顶点是一个区域边界路由器(ABR)或者自治系统边界路由器(ASBR)，才会添加路由
      */
     if (! IS_ROUTER_LSA_BORDER (lsa) && ! IS_ROUTER_LSA_EXTERNAL (lsa))
     {
@@ -355,7 +355,7 @@ ospf_intra_add_router (struct route_table *rt, struct vertex *v,
     or->u.std.area_id = area->area_id; /* 区域id */
     or->u.std.external_routing = area->external_routing;
     or->path_type = OSPF_PATH_INTRA_AREA; /* 区域内路由 */
-    or->cost = v->distance; /* 距离 */
+    or->cost = v->distance; /* 距离或者开销 */
     or->type = OSPF_DESTINATION_ROUTER;
     or->u.std.origin = (struct lsa_header *) lsa;
     or->u.std.options = lsa->header.options;
@@ -373,7 +373,7 @@ ospf_intra_add_router (struct route_table *rt, struct vertex *v,
        (similar to the calculation in Section 16.1.1). */
 
     p.family = AF_INET;
-    p.prefix = v->id;
+    p.prefix = v->id; /* DR路由器接口上的地址 */
     p.prefixlen = IPV4_MAX_BITLEN;
 
     if (IS_DEBUG_OSPF_EVENT)
@@ -417,7 +417,7 @@ ospf_intra_add_transit (struct route_table *rt, struct vertex *v,
        Vertex ID (Link State ID) with its associated subnet mask (found
        in the body of the associated network-LSA).
     * 如果新添加的顶点是一个传输网络,那么到达这个网络的路由条目已经确定
-    * 此路由的Destination ID是 网络号,这个可以通过将lsid 和 子网掩码去交集得到
+    * 此路由的Destination ID是 网络号,这个可以通过将lsa id 和 子网掩码取交集得到
     */
     p.family = AF_INET;
     p.prefix = v->id; /* 一般是DR的ip地址 */

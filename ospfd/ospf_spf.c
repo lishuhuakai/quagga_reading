@@ -136,7 +136,7 @@ update_stat (void *node, int position)
     struct vertex *v = node;
 
     /* Set the status of the vertex, when its position changes. */
-    *(v->stat) = position;
+    *(v->stat) = position; /* 记录下顶点在优先队列中的下标 */
 }
 
 static struct vertex_nexthop *
@@ -324,7 +324,9 @@ ospf_vertex_add_parent (struct vertex *v)
     {
         assert (vp->parent && vp->parent->children);
 
-        /* No need to add two links from the same parent. */
+        /* No need to add two links from the same parent.
+         * 如果顶点v没有在顶点v的父节点对应的子节点中,需要添加一下
+         */
         if (listnode_lookup (vp->parent->children, v) == NULL)
             listnode_add (vp->parent->children, v); /* 加入到子节点列表中 */
     }
@@ -352,7 +354,7 @@ ospf_spf_init (struct ospf_area *area)
 }
 
 /* return index of link back to V from W, or -1 if no link found
- * 判断w中是否有一个链接指向v
+ * 判断w中是否有一个链接指向v,如果存在,返回lsa的index
  */
 static int
 ospf_lsa_has_link (struct lsa_header *w, struct lsa_header *v)
@@ -482,7 +484,7 @@ ospf_spf_flush_parents (struct vertex *w)
  * Consider supplied next-hop for inclusion to the supplied list of
  * equal-cost next-hops, adjust list as neccessary.
  * root节点到w的距离为distance
- * w->v的下一条信息为 newhop
+ * v->w的下一条信息为 newhop
  */
 static void
 ospf_spf_add_parent (struct vertex *v, struct vertex *w,
@@ -539,7 +541,7 @@ ospf_spf_add_parent (struct vertex *v, struct vertex *w,
             return;
         }
     }
-    /* 构建一条从w->v的节点的下一跳信息 */
+    /* 构建一条从v->w的节点的下一跳信息 */
     vp = vertex_parent_new (v, ospf_lsa_has_link (w->lsa, v->lsa), newhop);
     /* 将vp加入父节点链表中 */
     /* 通过节点v可以到达节点w */
@@ -552,7 +554,7 @@ ospf_spf_add_parent (struct vertex *v, struct vertex *w,
  * vertex W (destination), with given distance from root->W.
  *
  * 给定从root节点到顶点W的距离,也就是参数中的distance
- * 而且我们一致如何到达顶点V,现在要获取的是，如何从root
+ * 而且我们已知如何到达顶点V,现在要获取的是，如何从root
  * 节点到达顶点V,而且我们已知,顶点V和顶点W有链路相连
  *
  * The link must be supplied if V is the root vertex. In all other cases
@@ -565,7 +567,9 @@ ospf_spf_add_parent (struct vertex *v, struct vertex *w,
  * this function returns. This function will update the W vertex with the
  * provided distance as appropriate.
  * 添加成功返回1,否则返回0
- *
+ * 此函数主要用于计算下一跳的信息
+ * @area 区域信息
+ * @v/w 顶点
  */
 static unsigned int
 ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
@@ -622,7 +626,7 @@ ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
         }
 
         if (w->type == OSPF_VERTEX_ROUTER) /* v和w在同一个区域内 */
-        {
+        { /* w是一个路由器 */
             /* l  is a link from v to w
              * l是从v到w的一条链路
              * l2 will be link from w to v
@@ -748,7 +752,7 @@ ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
             assert(w->type == OSPF_VERTEX_NETWORK);
 
             nh = vertex_nexthop_new ();
-            nh->oi = oi; /* 直接通过接口传送就行了？这是一个直连网络么? */
+            nh->oi = oi; /* 直接通过接口传送就行了？这是一个直连网络么?是直连的 */
             nh->router.s_addr = 0; /* Nexthop not required */
             ospf_spf_add_parent (v, w, nh, distance);
             return 1;
@@ -761,7 +765,7 @@ ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
         for (ALL_LIST_ELEMENTS (v->parents, node, nnode, vp))
         {
             /* root节点和顶点V相连 */
-            if (vp->parent == area->spf) /* connects to root? */
+            if (vp->parent == area->spf) /* connects to root? root --> v */
             {
                 /* V有一个父节点为root节点 */
                 /* 16.1.1 para 5. ...the parent vertex is a network that
@@ -792,6 +796,7 @@ ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
                     nh->oi = vp->nexthop->oi; /* 出接口 */
                     nh->router = l->link_data; /* 下一跳ip */
                     added = 1;
+                    /* 通过v到达w,是一条更加优秀的路径 */
                     ospf_spf_add_parent (v, w, nh, distance);
                 }
                 /* Note lack of return is deliberate. See next comment. */
@@ -864,8 +869,10 @@ ospf_spf_next (struct vertex *v, struct ospf_area *area,
     int type = 0, lsa_pos=-1, lsa_pos_next=0;
 
     /* If this is a router-LSA, and bit V of the router-LSA (see Section
-       A.4.2:RFC2328) is set, set Area A's TransitCapability to TRUE.  */
-    if (v->type == OSPF_VERTEX_ROUTER) /* 路由lsa */
+       A.4.2:RFC2328) is set, set Area A's TransitCapability to TRUE.
+     * 如果是第一类lsa(路由lsa)
+     */
+    if (v->type == OSPF_VERTEX_ROUTER) /* 顶点类型是一个路由器 */
     {
         /* 虚链路 */
         if (IS_ROUTER_LSA_VIRTUAL ((struct router_lsa *) v->lsa))
@@ -887,12 +894,15 @@ ospf_spf_next (struct vertex *v, struct ospf_area *area,
         unsigned int distance;
 
         /* In case of V is Router-LSA. */
-        if (v->lsa->type == OSPF_ROUTER_LSA) /* router-lsa */
+        if (v->lsa->type == OSPF_ROUTER_LSA) /*第一类lsa router-lsa */
         {
+            /* 需要说明一下,route lsa记录了和此路由器直接相连的链路的情况
+             * 或者说,从此节点出发,可以到达哪一个节点(路由器),而且带有度量值.
+             */
             l = (struct router_lsa_link *) p;
 
             lsa_pos = lsa_pos_next; /* LSA link position */
-            lsa_pos_next++;
+            lsa_pos_next++; /* 记录遍历的顶点 */
             /* p移动到下一个lsa */
             p += (OSPF_ROUTER_LSA_LINK_SIZE +
                   (l->m[0].tos_count * OSPF_ROUTER_LSA_TOS_SIZE));
@@ -903,8 +913,9 @@ ospf_spf_next (struct vertex *v, struct ospf_area *area,
                calculation.
             * 连接到一个末梢网络,也就是这里实际代表了一个路由信息，spf只处理
             * 拓扑信息
+            * 也就是说,如果一个接口连接了末梢网络,从这个接口出发,到达不了任何网段.
             */
-            if ((type = l->m[0].type) == LSA_LINK_TYPE_STUB)
+            if ((type = l->m[0].type) == LSA_LINK_TYPE_STUB) /* 末梢网络,此网段仅有一个路由器 */
                 continue;
 
             /* Infinite distance links shouldn't be followed, except
@@ -942,7 +953,7 @@ ospf_spf_next (struct vertex *v, struct ospf_area *area,
                             zlog_debug ("found Router LSA %s", inet_ntoa (l->link_id));
                     }
                     break;
-                case LSA_LINK_TYPE_TRANSIT: /* 传送网络 */
+                case LSA_LINK_TYPE_TRANSIT: /* 传送网络,直接找DR发送的网络 lsa */
                     if (IS_DEBUG_OSPF_EVENT)
                         zlog_debug ("Looking up Network LSA, ID: %s",
                                     inet_ntoa (l->link_id));
@@ -1040,17 +1051,20 @@ ospf_spf_next (struct vertex *v, struct ospf_area *area,
             /* Calculate nexthop to W. */
             /* lsa_pos表示是第几个lsa
              * 处理路由信息,我们已经知道如何到达顶点v了,通过顶点v可以到达顶点w
-             * 因此要要添加到达顶点w的路由信息
+             * 因此要要添加到达顶点w的路由信息,当然,现在加的路径不一定是最短的,但是通过spf算法,
+             * 我们最终可以获得一条导到w的最短路径
+             * 因为这是第一次计算到顶点w的最短路径,所以调用ospf_nexthop_calculation没有什么关系,
+             * 后面调用这个函数,除非找到了一条从root到w的更加优秀的路径.
              */
             if (ospf_nexthop_calculation (area, v, w, l, distance, lsa_pos))
                 pqueue_enqueue (w, candidate); /* 将节点加入优先队列 */
             else if (IS_DEBUG_OSPF_EVENT)
                 zlog_debug ("Nexthop Calc failed");
         }
-        else if (w_lsa->stat >= 0)
+        else if (w_lsa->stat >= 0) /* w_lsa对应的节点w已经在优先队列中了 */
         {
             /* Get the vertex from candidates. */
-            w = candidate->array[w_lsa->stat]; /* 获取顶点信息,也就是w已经在生成树中了 */
+            w = candidate->array[w_lsa->stat]; /* 获取顶点信息 */
 
             /* if D is greater than.
              * w->distance表示root节点到w的距离
@@ -1129,7 +1143,7 @@ ospf_spf_dump (struct vertex *v, int i)
 
 /* Second stage of SPF calculation.
  * 处理末梢区域
- * 所谓末梢区域,值得是只有一台路由器连接外部网络的这个一个网络
+ * 所谓末梢区域,指的是只有一台路由器连接外部网络的这个一个网络
  */
 static void
 ospf_spf_process_stubs (struct ospf_area *area, struct vertex *v,
@@ -1262,7 +1276,8 @@ ospf_spf_calculate (struct ospf_area *area, struct route_table *new_table,
     /* 区域的lsdb中记录了所有的此区域所有的lsa */
     ospf_lsdb_clean_stat (area->lsdb);
     /* Create a new heap for the candidates.
-     * 为所有的候选者创建一个优先级队列
+     * 为所有的候选者创建一个优先级队列,这个队列根据从root节点到某个顶点的距离进行排序
+     * 首先输出的是距离最短的顶点.
      */
     candidate = pqueue_create();
     candidate->cmp = cmp;
@@ -1381,7 +1396,7 @@ ospf_spf_calculate_timer (struct thread *thread)
 
     ospf_vl_unapprove (ospf);
 
-    /* Calculate SPF for each area. 
+    /* Calculate SPF for each area.
 	 * 每一个区域都需要运行SPF
 	 */
     for (ALL_LIST_ELEMENTS (ospf->areas, node, nnode, area)) /* 遍历每一个区域 */

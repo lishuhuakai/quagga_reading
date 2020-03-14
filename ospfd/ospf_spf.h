@@ -47,7 +47,7 @@ struct vertex
     u_int32_t distance;   /* from root to this vertex */
     /* 记录到父节点的下一跳信息 */
     struct list *parents;     /* list of parents in SPF tree */
-    /* spf树中的子节点,可能有多个 */
+    /* spf树中的子节点,可能有多个,也就是从这个顶点出发,可以到达的其他顶点 */
     struct list *children;    /* list of children in SPF tree*/
 };
 

@@ -3207,6 +3207,8 @@ ospf_lsa_lookup_by_prefix (struct ospf_lsdb *lsdb, u_char type,
 
 /*
  * 查找lsa
+ * @area lsa所属的区域
+ * @type lsa的类型
  */
 struct ospf_lsa *
 ospf_lsa_lookup (struct ospf_area *area, u_int32_t type,

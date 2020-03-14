@@ -395,7 +395,7 @@ struct ospf_area
     /* Statistics field. */
     u_int32_t spf_calculation;    /* SPF Calculation Count. */
 
-    /* Time stamps. */
+    /* Time stamps. 运行生成树的时间戳 */
     struct timeval ts_spf;        /* SPF calculation time stamp. */
 
     /* Router count. */
