@@ -1,2 +1,2 @@
 # quagga_reading
-quagga
+quagga 1.2.4
