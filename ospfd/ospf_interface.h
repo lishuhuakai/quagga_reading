@@ -132,7 +132,7 @@ struct crypt_key
 struct ospf_interface
 {
     /* This interface's parent ospf instance. */
-    struct ospf *ospf;
+    struct ospf *ospf; /* 接口对应的ospf实例 */
 
     /* OSPF Area. */
     /* 接口所属的区域 */
@@ -148,13 +148,14 @@ struct ospf_interface
     struct ospf_vl_data *vl_data;     /* Data for Virtual Link */
 
     /* Packet send buffer. */
+    /* 数据包发送队列 */
     struct ospf_fifo *obuf;       /* Output queue */
 
     /* OSPF Network Type. */
     u_char type;
 
     /* State of Interface State Machine. */
-    u_char state;
+    u_char state; /* 接口状态机 */
 
     /* To which multicast groups do we currently belong? */
     u_char multicast_memberships;
@@ -200,7 +201,7 @@ struct ospf_interface
     struct ospf_lsa *network_lsa_self;    /* network-LSA. */
     struct list *opaque_lsa_self;         /* Type-9 Opaque-LSAs */
 
-    struct route_table *ls_upd_queue;
+    struct route_table *ls_upd_queue; /* 链路状态更新的lsa */
 
     struct list *ls_ack;          /* Link State Acknowledgment list. */
 

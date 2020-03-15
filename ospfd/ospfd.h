@@ -306,6 +306,7 @@ struct ospf_area
     struct list *address_range;
 
     /* Configured variables. */
+    /* external_routing,用于标记此区域是何种区域,0->普通区域,1->stub区域, 2->nssa */
     int external_routing;                 /* ExternalRoutingCapability. */
 #define OSPF_AREA_DEFAULT       0
 #define OSPF_AREA_STUB          1

@@ -1,5 +1,6 @@
 /*
  * OSPF Flooding -- RFC2328 Section 13.
+ * OSPF 洪泛
  * Copyright (C) 1999, 2000 Toshiaki Takada
  *
  * This file is part of GNU Zebra.
@@ -333,6 +334,9 @@ ospf_flood (struct ospf *ospf, struct ospf_neighbor *nbr,
 }
 
 /* OSPF LSA flooding -- RFC2328 Section 13.3. */
+/* 通过ospf接口来洪泛lsa
+ * @inbr 表示lsa从此邻居处接收 in neighbor
+ */
 static int
 ospf_flood_through_interface (struct ospf_interface *oi,
                               struct ospf_neighbor *inbr,
@@ -357,6 +361,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
     /* Each of the neighbors attached to this interface are examined,
        to determine whether they must receive the new LSA.  The following
        steps are executed for each neighbor: */
+     /* 这个接口上的邻居都要被检查,看它们是否应当接收新的lsa */
     for (rn = route_top (oi->nbrs); rn; rn = route_next (rn))
     {
         struct ospf_lsa *ls_req;
@@ -373,6 +378,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
         /* If the neighbor is in a lesser state than Exchange, it
         does not participate in flooding, and the next neighbor
          should be examined. */
+        /* 仅仅向和建立的邻接关系的邻居洪泛 */
         if (onbr->state < NSM_Exchange)
             continue;
 
@@ -381,7 +387,10 @@ ospf_flood_through_interface (struct ospf_interface *oi,
          list associated with this adjacency.  If there is an
          instance of the new LSA on the list, it indicates that
          the neighboring router has an instance of the LSA
-         already.  Compare the new LSA to the neighbor's copy: */
+         already.  Compare the new LSA to the neighbor's copy:
+        */
+        /* 如果邻居还没有达到full状态(exchange或者loading),检查和这个邻居相关的链路状态请求链表
+         * 看lsa是否存在于链路状态请求链表中,这意味着此邻居已经拥有该lsa的实例了 */
         if (onbr->state < NSM_Full)
         {
             if (IS_DEBUG_OSPF_EVENT)
@@ -397,6 +406,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
                     continue;
                 /* The two copies are the same instance, then delete
                 the LSA from the Link state request list. */
+                /* 如果两个lsa实例一致,将lsa从请求列表中删掉,因为我已经获得了,不用再次请求 */
                 else if (ret == 0)
                 {
                     ospf_ls_request_delete (onbr, ls_req);
@@ -405,6 +415,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
                 }
                 /* The new LSA is more recent.  Delete the LSA
                 from the Link state request list. */
+                /* 新的lsa更加新,也就是说这个lsa要发给此邻居 */
                 else
                 {
                     ospf_ls_request_delete (onbr, ls_req);
@@ -462,6 +473,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
         for the adjacency. The LSA will be retransmitted
          at intervals until an acknowledgment is seen from
          the neighbor. */
+        /* 将新的lsa加入链路状态重传链表中  */
         ospf_ls_retransmit_add (onbr, lsa);
         retx_flag = 1;
     }
@@ -469,6 +481,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
     /* If in the previous step, the LSA was NOT added to any of
        the Link state retransmission lists, there is no need to
        flood the LSA out the interface. */
+    /* 如果在上一步中,lsa没有被加到任何一个链路状态重传列表中,说明没有必要广播此lsa */
     if (retx_flag == 0)
     {
         return (inbr && inbr->oi == oi);
@@ -482,6 +495,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
         received from either the Designated Router or the Backup
          Designated Router, chances are that all the neighbors have
          received the LSA already. */
+        /* 如果lsa在此接口上收到,而且来自DR或者BDR,那么有概率其他邻居已经接收到了这个lsa */
         if (NBR_IS_DR (inbr) || NBR_IS_BDR (inbr))
         {
             if (IS_DEBUG_OSPF_NSSA)
@@ -511,6 +525,8 @@ ospf_flood_through_interface (struct ospf_interface *oi,
        (which must be > 0) when it is copied into the outgoing Link
        State Update packet (until the LS age field reaches the maximum
        value of MaxAge). */
+    /* 此lsa必须要在接口上洪泛,发送链路状态更新包(包含此lsa),lsa的老化时间需要增加一个
+     * InfTransDelay */
     /* XXX HASSO: Is this IS_DEBUG_OSPF_NSSA really correct? */
     if (IS_DEBUG_OSPF_NSSA)
         zlog_debug ("ospf_flood_through_interface(): "
@@ -529,7 +545,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
 
         for (rn = route_top (oi->nbrs); rn; rn = route_next (rn))
             if ((nbr = rn->info) != NULL)
-                if (nbr != oi->nbr_self && nbr->state >= NSM_Exchange)
+                if (nbr != oi->nbr_self && nbr->state >= NSM_Exchange) /* 发的是单播包 */
                     ospf_ls_upd_send_lsa (nbr, lsa, OSPF_SEND_PACKET_DIRECT);
     }
     else
@@ -553,7 +569,7 @@ ospf_flood_through_area (struct ospf_area *area,
        eligible interfaces are all those interfaces attaching to the
        Area A.  If Area A is the backbone, this includes all the virtual
        links.  */
-    for (ALL_LIST_ELEMENTS (area->oiflist, node, nnode, oi))
+    for (ALL_LIST_ELEMENTS (area->oiflist, node, nnode, oi)) /* 遍历区域的接口列表 */
     {
         if (area->area_id.s_addr != OSPF_AREA_BACKBONE &&
             oi->type ==  OSPF_IFTYPE_VIRTUALLINK)
@@ -578,6 +594,7 @@ ospf_flood_through_area (struct ospf_area *area,
     return (lsa_ack_flag);
 }
 
+/* 将lsa洪泛到整个ospf自治系统 */
 int
 ospf_flood_through_as (struct ospf *ospf, struct ospf_neighbor *inbr,
                        struct ospf_lsa *lsa)
@@ -589,10 +606,12 @@ ospf_flood_through_as (struct ospf *ospf, struct ospf_neighbor *inbr,
     lsa_ack_flag = 0;
 
     /* The incoming LSA is type 5 or type 7  (AS-EXTERNAL or AS-NSSA )
-
+      如果lsa是5类或者7类
       Divert the Type-5 LSA's to all non-NSSA/STUB areas
+      将5类lsa洪泛至所有的非NSSA以及非stub区域
 
       Divert the Type-7 LSA's to all NSSA areas
+      将7类的lsa洪泛至所有的NSSA区域
 
        AS-external-LSAs are flooded throughout the entire AS, with the
        exception of stub areas (see Section 3.6).  The eligible
@@ -603,12 +622,12 @@ ospf_flood_through_as (struct ospf *ospf, struct ospf_neighbor *inbr,
         if (IS_DEBUG_OSPF_NSSA)
             zlog_debug ("Flood/AS: NSSA TRANSLATED LSA");
 
-    for (ALL_LIST_ELEMENTS_RO (ospf->areas, node, area))
+    for (ALL_LIST_ELEMENTS_RO (ospf->areas, node, area)) /* 遍历所有的区域 */
     {
         int continue_flag = 0;
         struct listnode *if_node;
         struct ospf_interface *oi;
-
+        /* 下面仅仅是用于判断,此lsa能否洪泛到该区域 */
         switch (area->external_routing)
         {
             /* Don't send AS externals into stub areas.  Various types
@@ -658,6 +677,11 @@ ospf_flood_through_as (struct ospf *ospf, struct ospf_neighbor *inbr,
     return (lsa_ack_flag);
 }
 
+/* 洪泛lsa
+ * @ospf ospf实例
+ * @inbr 邻居
+ * @lsa 待洪泛的lsa
+ */
 int
 ospf_flood_through (struct ospf *ospf,
                     struct ospf_neighbor *inbr, struct ospf_lsa *lsa)
@@ -801,6 +825,9 @@ ospf_ls_request_lookup (struct ospf_neighbor *nbr, struct ospf_lsa *lsa)
     return ospf_lsdb_lookup (&nbr->ls_req, lsa);
 }
 
+/*
+ * 构建一个新的lsa请求结构
+ */
 struct ospf_lsa *
 ospf_ls_request_new (struct lsa_header *lsah)
 {
@@ -808,7 +835,7 @@ ospf_ls_request_new (struct lsa_header *lsah)
 
     new = ospf_lsa_new ();
     new->data = ospf_lsa_data_new (OSPF_LSA_HEADER_SIZE);
-    memcpy (new->data, lsah, OSPF_LSA_HEADER_SIZE);
+    memcpy (new->data, lsah, OSPF_LSA_HEADER_SIZE); /* 直接拷贝 */
 
     return new;
 }
@@ -833,7 +860,9 @@ ospf_ls_retransmit_isempty (struct ospf_neighbor *nbr)
     return ospf_lsdb_isempty (&nbr->ls_rxmt);
 }
 
-/* Add LSA to be retransmitted to neighbor's ls-retransmit list. */
+/* Add LSA to be retransmitted to neighbor's ls-retransmit list.
+ * 往邻居的链路状态重传列表中添加lsa
+ */
 void
 ospf_ls_retransmit_add (struct ospf_neighbor *nbr, struct ospf_lsa *lsa)
 {
@@ -878,7 +907,9 @@ ospf_ls_retransmit_delete (struct ospf_neighbor *nbr, struct ospf_lsa *lsa)
     }
 }
 
-/* Clear neighbor's ls-retransmit list. */
+/* Clear neighbor's ls-retransmit list.
+ * 清空邻居的链路重传链表
+ */
 void
 ospf_ls_retransmit_clear (struct ospf_neighbor *nbr)
 {
@@ -958,7 +989,8 @@ ospf_ls_retransmit_delete_nbr_as (struct ospf *ospf, struct ospf_lsa *lsa)
 /* Sets ls_age to MaxAge and floods throu the area.
    When we implement ASE routing, there will be anothe function
    flushing an LSA from the whole domain.
- * 所谓的flush area,就是让整个lsa尽快从整个网络中移除
+ * 所谓的flush area,就是让整个lsa尽快从整个网络中移除,注意,仅有始发这条lsa的路由器
+ * 才能提前将这条lsa老化
  */
 void
 ospf_lsa_flush_area (struct ospf_lsa *lsa, struct ospf_area *area)
@@ -966,7 +998,7 @@ ospf_lsa_flush_area (struct ospf_lsa *lsa, struct ospf_area *area)
     /* Reset the lsa origination time such that it gives
        more time for the ACK to be received and avoid
        retransmissions */
-    lsa->data->ls_age = htons (OSPF_LSA_MAXAGE);
+    lsa->data->ls_age = htons (OSPF_LSA_MAXAGE); /* 当然,最好的方法就是将老化时间设为最大,然后洪泛出去 */
     lsa->tv_recv = recent_relative_time ();
     lsa->tv_orig = lsa->tv_recv;
     ospf_flood_through_area (area, NULL, lsa);

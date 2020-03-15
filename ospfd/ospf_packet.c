@@ -145,7 +145,9 @@ ospf_fifo_new ()
     return new;
 }
 
-/* Add new packet to fifo. */
+/* Add new packet to fifo.
+ * 将新包加入fifo队列
+ */
 void
 ospf_fifo_push (struct ospf_fifo *fifo, struct ospf_packet *op)
 {
@@ -628,6 +630,7 @@ ospf_write_frags (int fd, struct ospf_packet *op, struct ip *iph,
 }
 #endif /* WANT_OSPF_WRITE_FRAGMENT */
 
+/* ospfd发包 */
 static int
 ospf_write (struct thread *thread)
 {
@@ -808,6 +811,9 @@ ospf_write (struct thread *thread)
 
 /* OSPF Hello message read -- RFC2328 Section 10.5.
  * ospf处理hello包
+ * @iph ip头部
+ * @ospfh ospf头部
+ * @oi 接收此数据包的接口
  */
 static void
 ospf_hello (struct ip *iph, struct ospf_header *ospfh,
@@ -854,7 +860,7 @@ ospf_hello (struct ip *iph, struct ospf_header *ospfh,
         }
 
     /* Compare Router Dead Interval. */
-    if (OSPF_IF_PARAM (oi, v_wait) != ntohl (hello->dead_interval))
+    if (OSPF_IF_PARAM (oi, v_wait) != ntohl (hello->dead_interval)) /* dead interval不匹配,丢弃 */
     {
         zlog_warn ("Packet %s [Hello:RECV]: RouterDeadInterval mismatch "
                    "(expected %u, but received %u).",
@@ -866,7 +872,7 @@ ospf_hello (struct ip *iph, struct ospf_header *ospfh,
     /* Compare Hello Interval - ignored if fast-hellos are set. */
     if (OSPF_IF_PARAM (oi, fast_hello) == 0)
     {
-        if (OSPF_IF_PARAM (oi, v_hello) != ntohs (hello->hello_interval))
+        if (OSPF_IF_PARAM (oi, v_hello) != ntohs (hello->hello_interval)) /* hello interval不匹配,丢弃 */
         {
             zlog_warn ("Packet %s [Hello:RECV]: HelloInterval mismatch "
                        "(expected %u, but received %u).",
@@ -1048,7 +1054,7 @@ ospf_db_desc_save_current (struct ospf_neighbor *nbr,
     nbr->last_recv.dd_seqnum = ntohl (dd->dd_seqnum);
 }
 
-/* Process rest of DD packet.
+/* Process rest of DBD packet.
  * 处理剩下的dd包
  */
 static void
@@ -1151,7 +1157,7 @@ ospf_db_desc_proc (struct stream *s, struct ospf_interface *oi,
     /* 邻居是主路由器 */
     if (IS_SET_DD_MS (nbr->dd_flags))
     {
-        nbr->dd_seqnum++;
+        nbr->dd_seqnum++; /* 主路由器控制dd_seqnum,slave回复的包要包含此dd_seqnum */
 
         /* Both sides have no More, then we're done with Exchange
          * 信息交换完毕
@@ -1362,7 +1368,9 @@ ospf_db_desc (struct ip *iph, struct ospf_header *ospfh,
                     /* This situation is undesirable, but not a real error. */
                 }
             }
-            /* 两台路由器协商完毕 */
+            /* 两台路由器协商完毕,Master收到Slave发送的确认包,或者Slave通过比较,发现自己的route id
+             * 更低,都认为是协商完毕
+             */
             OSPF_NSM_EVENT_EXECUTE (nbr, NSM_NegotiationDone);
 
             /* continue processing rest of packet. */
@@ -1386,7 +1394,7 @@ ospf_db_desc (struct ip *iph, struct ospf_header *ospfh,
             }
 
             /* Otherwise DD packet should be checked. */
-            /* Check Master/Slave bit mismatch
+            /* Check Master/Slave bit mismatch 主从位不一致
              * 和上次发送的不一致
              */
             if (IS_SET_DD_MS (dd->flags) != IS_SET_DD_MS (nbr->last_recv.flags))
@@ -1606,7 +1614,7 @@ ospf_ls_upd_list_lsa (struct ospf_neighbor *nbr, struct stream *s,
 
     lsas = list_new ();
 
-    count = stream_getl (s);
+    count = stream_getl (s); /* lsa的数目 */
     size -= OSPF_LS_UPD_MIN_SIZE; /* # LSAs */
 
     for (; size >= OSPF_LSA_HEADER_SIZE && count > 0;
@@ -1688,7 +1696,7 @@ ospf_ls_upd_list_lsa (struct ospf_neighbor *nbr, struct stream *s,
            and area not in NSSA mode */
         switch (lsah->type)
         {
-            case OSPF_AS_EXTERNAL_LSA:
+            case OSPF_AS_EXTERNAL_LSA: /* 5类lsa,外部导入 */
             case OSPF_OPAQUE_AS_LSA:
                 lsa->area = NULL;
                 break;
@@ -1727,7 +1735,6 @@ ospf_upd_list_clean (struct list *lsas)
 
 /* OSPF Link State Update message read -- RFC2328 Section 13.
  * 处理链路状态更新数据包
- * 但是我貌似没有看见保存lsa的动作
  */
 static void
 ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
@@ -1813,6 +1820,7 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
         /* (2) LSA Type  - Done above by ospf_ls_upd_list_lsa() */
 
         /* (3) Do not take in AS External LSAs if we are a stub or NSSA. */
+        /* 3.不导入as域外lsa,如果我们是stub或者NSSA区域的话 */
 
         /* Do not take in AS NSSA if this neighbor and we are not NSSA */
 
@@ -1978,7 +1986,8 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
          database copy, or the received LSA is more recent than
          the database copy the following steps must be performed.
                (The sub steps from RFC 2328 section 13 step (5) will be performed in
-               ospf_flood() ) */
+               ospf_flood() )
+         * 5.在当前路由器的lsdb中查找此LSA的实例,如果没有找到,或者接收到的lsa更新,执行下面的操作 */
 
         if (current == NULL ||
             /* 对方传递过来的lsa更加新 */
@@ -1997,7 +2006,10 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
          the Database Exchange process.  In this case, restart the
          Database Exchange process by generating the neighbor event
          BadLSReq for the sending neighbor and stop processing the
-         Link State Update packet. */
+         Link State Update packet.
+       * 如果邻居的链路状态请求列表中也存在此lsa实例
+       * 否则的话,数据库交换的过程发生了错误,重新启动数据库交换过程
+       */
 
         if (ospf_ls_request_lookup (nbr, lsa))
         {
@@ -2014,7 +2026,9 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
 
         /* If the received LSA is the same instance as the database copy
         (i.e., neither one is more recent) the following two steps
-         should be performed: */
+         should be performed:
+        * 如果收到的lsa和数据库中的拷贝是一致的,将执行下面的操作
+        */
 
         if (ret == 0)
         {
@@ -2947,7 +2961,7 @@ ospf_read (struct thread *thread)
             zlog_debug ("-----------------------------------------------------");
             ospf_packet_dump (ibuf);
         }
-
+        /* 从某个接口收到了包 */
         zlog_debug ("%s received from [%s] via [%s]",
                     LOOKUP (ospf_packet_type_str, ospfh->type),
                     inet_ntoa (ospfh->router_id), IF_NAME (oi));
@@ -2966,10 +2980,10 @@ ospf_read (struct thread *thread)
     /* Read rest of the packet and call each sort of packet routine. */
     switch (ospfh->type)
     {
-        case OSPF_MSG_HELLO:
+        case OSPF_MSG_HELLO: /* 接收到了hello报文 */
             ospf_hello (iph, ospfh, ibuf, oi, length);
             break;
-        case OSPF_MSG_DB_DESC:
+        case OSPF_MSG_DB_DESC: /* DBD包 */
             ospf_db_desc (iph, ospfh, ibuf, oi, length);
             break;
         case OSPF_MSG_LS_REQ: /* 处理lsa请求包 */
@@ -3191,6 +3205,7 @@ ospf_make_db_desc (struct ospf_interface *oi, struct ospf_neighbor *nbr,
         goto empty;
 
     /* Describe LSA Header from Database Summary List. */
+    /* 我有些好奇,邻居的lsdb从何而来? */
     lsdb = &nbr->db_sum;
 
     /* 一共有11种类型的lsa */
@@ -3302,7 +3317,7 @@ ospf_make_ls_req (struct ospf_neighbor *nbr, struct stream *s)
             if ((lsa = (rn->info)) != NULL)
                 if (ospf_make_ls_req_func (s, &length, delta, nbr, lsa) == 0)
                 {
-                    route_unlock_node (rn);
+                    route_unlock_node (rn); /*   route_top,route_next之类的函数取出一个lsa,会加锁,使用完了要解锁 */
                     break;
                 }
     }
@@ -3632,6 +3647,7 @@ ospf_db_desc_resend (struct ospf_neighbor *nbr)
 
 /* Send Link State Request.
  * 发送链路状态请求包
+ * 为什么没有将发送的链路状态请求包加入重传链表?
  */
 void
 ospf_ls_req_send (struct ospf_neighbor *nbr)
@@ -3667,6 +3683,7 @@ ospf_ls_req_send (struct ospf_neighbor *nbr)
         op->dst = nbr->address.u.prefix4;
 
     /* Add packet to the interface output queue. */
+    /* 将要发送的包放入接口的output队列 */
     ospf_packet_add (oi, op);
 
     /* Hook thread to write packet. */
@@ -3805,7 +3822,7 @@ ospf_ls_upd_queue_send (struct ospf_interface *oi, struct list *update,
 static int
 ospf_ls_upd_send_queue_event (struct thread *thread)
 {
-    struct ospf_interface *oi = THREAD_ARG(thread);
+    struct ospf_interface *oi = THREAD_ARG(thread); /* 接口上发送链路状态更新包 */
     struct route_node *rn;
     struct route_node *rnext;
     struct list *update;

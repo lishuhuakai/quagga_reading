@@ -69,21 +69,21 @@ struct ospf_neighbor
     /* 链路状态摘要数据库 */
     struct ospf_lsdb db_sum;
     /* 链路状态请求列表 */
-    struct ospf_lsdb ls_req;
-    struct ospf_lsa *ls_req_last;
+    struct ospf_lsdb ls_req; /* 需要向邻居请求的lsa构成的链表 */
+    struct ospf_lsa *ls_req_last; /* 记录上一次请求的最后一个lsa */
 
     u_int32_t crypt_seqnum;           /* Cryptographic Sequence Number. */
 
     /* Timer values. */
     u_int32_t v_inactivity;
-    u_int32_t v_db_desc;
+    u_int32_t v_db_desc; /* dbd包重传时间间隔 */
     u_int32_t v_ls_req;
     u_int32_t v_ls_upd;
 
     /* Threads. */
     struct thread *t_inactivity;
     struct thread *t_db_desc;
-    struct thread *t_ls_req;
+    struct thread *t_ls_req; /* 链路状态请求 */
     struct thread *t_ls_upd;
     struct thread *t_hello_reply;
 

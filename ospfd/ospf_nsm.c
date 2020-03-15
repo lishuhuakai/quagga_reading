@@ -69,6 +69,7 @@ ospf_inactivity_timer (struct thread *thread)
     return 0;
 }
 
+/* 重传dbb包 */
 static int
 ospf_db_desc_timer (struct thread *thread)
 {
@@ -107,7 +108,7 @@ nsm_timer_set (struct ospf_neighbor *nbr)
     {
         case NSM_Deleted:
         case NSM_Down:
-            OSPF_NSM_TIMER_OFF (nbr->t_inactivity);
+            OSPF_NSM_TIMER_OFF (nbr->t_inactivity); /* 关闭定时器 */
             OSPF_NSM_TIMER_OFF (nbr->t_hello_reply);
         case NSM_Attempt:
         case NSM_Init:
@@ -116,12 +117,12 @@ nsm_timer_set (struct ospf_neighbor *nbr)
             OSPF_NSM_TIMER_OFF (nbr->t_ls_upd);
             OSPF_NSM_TIMER_OFF (nbr->t_ls_req);
             break;
-        case NSM_ExStart:
+        case NSM_ExStart: /* 信息交换初始状态 */
             OSPF_NSM_TIMER_ON (nbr->t_db_desc, ospf_db_desc_timer, nbr->v_db_desc);
             OSPF_NSM_TIMER_OFF (nbr->t_ls_upd);
             OSPF_NSM_TIMER_OFF (nbr->t_ls_req);
             break;
-        case NSM_Exchange:
+        case NSM_Exchange: /* 信息交换状态 */
             OSPF_NSM_TIMER_ON (nbr->t_ls_upd, ospf_ls_upd_timer, nbr->v_ls_upd);
             if (!IS_SET_DD_MS (nbr->dd_flags))
                 OSPF_NSM_TIMER_OFF (nbr->t_db_desc);
@@ -205,6 +206,8 @@ ospf_db_summary_isempty (struct ospf_neighbor *nbr)
     return ospf_lsdb_isempty (&nbr->db_sum);
 }
 
+
+/* 将lsa添加到邻居的摘要数据库中 */
 static int
 ospf_db_summary_add (struct ospf_neighbor *nbr, struct ospf_lsa *lsa)
 {
@@ -230,10 +233,10 @@ ospf_db_summary_add (struct ospf_neighbor *nbr, struct ospf_lsa *lsa)
     if (CHECK_FLAG (lsa->flags, OSPF_LSA_LOCAL_XLT))
         return 0;
 
-    if (IS_LSA_MAXAGE (lsa))
+    if (IS_LSA_MAXAGE (lsa)) /* 到达了老化时间,最长为3600s */
         ospf_ls_retransmit_add (nbr, lsa);
     else
-        ospf_lsdb_add (&nbr->db_sum, lsa);
+        ospf_lsdb_add (&nbr->db_sum, lsa); /* 加到链路状态摘要数据库中 */
 
     return 0;
 }
@@ -263,7 +266,9 @@ ospf_db_summary_clear (struct ospf_neighbor *nbr)
    along with the AS-external-LSAs contained in the global structure.
    AS-external-LSAs are omitted from a virtual neighbor's Database
    summary list.  AS-external-LSAs are omitted from the Database
-   summary list if the area has been configured as a stub. */
+   summary list if the area has been configured as a stub.
+ * 链路状态数据库包含路由lsa,网络lsa,网络汇总lsa
+ */
 static int
 nsm_negotiation_done (struct ospf_neighbor *nbr)
 {
@@ -323,7 +328,7 @@ nsm_exchange_done (struct ospf_neighbor *nbr)
     if (nbr->t_ls_req == NULL)
         ospf_ls_req_send (nbr);
 
-    return NSM_Loading;
+    return NSM_Loading; /* 进入到loading状态 */
 }
 
 static int
@@ -762,7 +767,9 @@ nsm_change_state (struct ospf_neighbor *nbr, int state)
     /* Preserve old status? */
 }
 
-/* Execute NSM event process. */
+/* Execute NSM event process.
+ * 邻居状态机 事件处理
+ */
 int
 ospf_nsm_event (struct thread *thread)
 {
@@ -770,8 +777,8 @@ ospf_nsm_event (struct thread *thread)
     int next_state;
     struct ospf_neighbor *nbr;
 
-    nbr = THREAD_ARG (thread);
-    event = THREAD_VAL (thread);
+    nbr = THREAD_ARG (thread); /* 邻居节点 */
+    event = THREAD_VAL (thread); /* 发生的事件 */
 
     if (IS_DEBUG_OSPF (nsm, NSM_EVENTS))
         zlog_debug ("NSM[%s:%s]: %s (%s)", IF_NAME (nbr->oi),
@@ -779,7 +786,7 @@ ospf_nsm_event (struct thread *thread)
                     LOOKUP (ospf_nsm_state_msg, nbr->state),
                     ospf_nsm_event_str [event]);
 
-    next_state = NSM [nbr->state][event].next_state;
+    next_state = NSM [nbr->state][event].next_state; /* 下一个状态 */
 
     /* Call function. */
     if (NSM [nbr->state][event].func != NULL)

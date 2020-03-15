@@ -472,7 +472,7 @@ ospf_if_lookup_by_prefix (struct ospf *ospf, struct prefix_ipv4 *p)
 }
 
 /* determine receiving interface by ifp and source address
- * 根据接收数据包的接口以及源ip,获得对应的ospf信息
+ * 根据接收数据包的接口队列以及源ip,获得对应的ospf接口信息
  */
 struct ospf_interface *
 ospf_if_lookup_recv_if (struct ospf *ospf, struct in_addr src,

@@ -1242,6 +1242,7 @@ ospf_area_vlink_count (struct ospf *ospf, struct ospf_area *area)
     return count;
 }
 
+/* 将一个区域设置为stub区域 */
 int
 ospf_area_stub_set (struct ospf *ospf, struct in_addr area_id)
 {
@@ -1258,6 +1259,7 @@ ospf_area_stub_set (struct ospf *ospf, struct in_addr area_id)
     return 1;
 }
 
+/* 取消一个区域的stub属性,将其变为普通区域 */
 int
 ospf_area_stub_unset (struct ospf *ospf, struct in_addr area_id)
 {

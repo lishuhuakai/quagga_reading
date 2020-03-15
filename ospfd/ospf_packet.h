@@ -100,17 +100,19 @@ struct ospf_header
     } u;
 };
 
-/* OSPF Hello body format. */
+/* OSPF Hello body format.
+ * Hello报文包体
+ */
 struct ospf_hello
 {
-    struct in_addr network_mask;
+    struct in_addr network_mask; /*  发送数据包的接口的网络掩码 */
     u_int16_t hello_interval;
     u_char options;
-    u_char priority;
+    u_char priority; /* 优先级,用于做DR以及BDR的选举 */
     u_int32_t dead_interval;
     struct in_addr d_router;
     struct in_addr bd_router;
-    struct in_addr neighbors[1];
+    struct in_addr neighbors[1]; /* 记录邻居 */
 };
 
 /* OSPF Database Description body format. */
