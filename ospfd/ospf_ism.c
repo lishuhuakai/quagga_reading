@@ -76,6 +76,7 @@ ospf_dr_election_sub (struct list *routers)
     return max;
 }
 
+/* DR选举 */
 static struct ospf_neighbor *
 ospf_elect_dr (struct ospf_interface *oi, struct list *el_list)
 {
@@ -384,6 +385,7 @@ ism_timer_set (struct ospf_interface *oi)
 
 /* IE1
  * 端口起来这个事件会触发的状态更新
+ * @oi ospf接口
  */
 static int
 ism_interface_up (struct ospf_interface *oi)

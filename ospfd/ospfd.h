@@ -114,7 +114,7 @@ struct ospf
 #define OSPF_FLAG_ASBR          0x0002
 
     /* ABR type. */
-    u_char abr_type;
+    u_char abr_type; /* abr类型,每一种形式表现还不一样吗? */
 #define OSPF_ABR_UNKNOWN    0
 #define OSPF_ABR_STAND          1
 #define OSPF_ABR_IBM            2
@@ -183,12 +183,15 @@ struct ospf
     /* Routing tables. */
     struct route_table *old_table;        /* Old routing table. */
     /* 当前的路由表 */
+    /* 网段的路由表? */
     struct route_table *new_table;        /* Current routing table. */
 
     struct route_table *old_rtrs;         /* Old ABR/ASBR RT. */
+    /* 路由器路由表,到某个路由器的路由? */
     struct route_table *new_rtrs;         /* New ABR/ASBR RT. */
 
     struct route_table *new_external_route;   /* New External Route. */
+    /* 导入的路由? */
     struct route_table *old_external_route;   /* Old External Route. */
 
     struct route_table *external_lsas;    /* Database of external LSAs,
@@ -214,6 +217,7 @@ struct ospf
     unsigned int maxage_delay;        /* Delay on Maxage remover timer, sec */
     /* lsa移除定时器 */
     struct thread *t_maxage;              /* MaxAge LSA remover timer. */
+    /* 洪泛的定时器 */
     struct thread *t_maxage_walker;       /* MaxAge LSA checking timer. */
 
     struct thread *t_deferred_shutdown;   /* deferred/stub-router shutdown timer*/

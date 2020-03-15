@@ -685,6 +685,7 @@ ospf_area_check_free (struct ospf *ospf, struct in_addr area_id)
     }
 }
 
+/* 根据区域id查找一个区域,如果没有,就创建一个 */
 struct ospf_area *
 ospf_area_get (struct ospf *ospf, struct in_addr area_id, int format)
 {

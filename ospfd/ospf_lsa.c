@@ -818,6 +818,7 @@ ospf_stub_router_check (struct ospf_area *area)
     /* area must either be administratively configured to be stub
      * or startup-time stub-router must be configured and we must in a pre-stub
      * state.
+     * 区域要么是被管理员配置成了stub区域,要么是
      */
     if (CHECK_FLAG (area->stub_router_state, OSPF_AREA_ADMIN_STUB_ROUTED))
     {
@@ -3081,6 +3082,9 @@ ospf_lsa_maxage (struct ospf *ospf, struct ospf_lsa *lsa)
                    ospf->maxage_delay);
 }
 
+/*
+ * 移除老化的lsa
+ */
 static int
 ospf_lsa_maxage_walker_remover (struct ospf *ospf, struct ospf_lsa *lsa)
 {
@@ -3692,7 +3696,9 @@ ospf_schedule_lsa_flush_area (struct ospf_area *area, struct ospf_lsa *lsa)
 }
 
 
-/* LSA Refreshment functions. */
+/* LSA Refreshment functions.
+ * LSA刷新函数
+ */
 struct ospf_lsa *
 ospf_lsa_refresh (struct ospf *ospf, struct ospf_lsa *lsa)
 {
@@ -3848,7 +3854,7 @@ ospf_lsa_refresh_walker (struct thread *t)
 
         if (refresh_list)
         {
-            for (ALL_LIST_ELEMENTS (refresh_list, node, nnode, lsa))
+            for (ALL_LIST_ELEMENTS (refresh_list, node, nnode, lsa)) /* 遍历lsa */
             {
                 if (IS_DEBUG_OSPF (lsa, LSA_REFRESH))
                     zlog_debug ("LSA[Refresh:%s]: ospf_lsa_refresh_walker(): "

@@ -368,6 +368,8 @@ nsm_clear_adj (struct ospf_neighbor *nbr)
         UNSET_FLAG (nbr->options, OSPF_OPTION_O);
 }
 
+/* 端口down掉了,或者发生了别的什么事情
+ */
 static int
 nsm_kill_nbr (struct ospf_neighbor *nbr)
 {

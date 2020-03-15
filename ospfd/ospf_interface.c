@@ -285,7 +285,9 @@ ospf_if_cleanup (struct ospf_interface *oi)
     struct ospf_nbr_nbma *nbr_nbma;
     struct ospf_lsa *lsa;
 
-    /* oi->nbrs and oi->nbr_nbma should be deleted on InterfaceDown event */
+    /* oi->nbrs and oi->nbr_nbma should be deleted on InterfaceDown event
+     * 端口一旦down掉,端口上的邻居信息都要移除
+     */
     /* delete all static neighbors attached to this interface */
     for (ALL_LIST_ELEMENTS (oi->nbr_nbma, node, nnode, nbr_nbma))
     {

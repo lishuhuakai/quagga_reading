@@ -490,14 +490,14 @@ ospf_abr_nssa_check_status (struct ospf *ospf)
 }
 
 /* Check area border router status.
- * 检查区域边界路由器的状态
+ * 检查区域边界路由器的状态,或者说检查一下,本路由器是不是ABR
  */
 void
 ospf_check_abr_status (struct ospf *ospf)
 {
     struct ospf_area *area;
     struct listnode *node, *nnode;
-    int bb_configured = 0;
+    int bb_configured = 0; /* 是否存在骨干区域 */
     int bb_act_attached = 0;
     int areas_configured = 0;
     int areas_act_attached = 0;
@@ -506,7 +506,7 @@ ospf_check_abr_status (struct ospf *ospf)
     if (IS_DEBUG_OSPF_EVENT)
         zlog_debug ("ospf_check_abr_status(): Start");
 
-    for (ALL_LIST_ELEMENTS (ospf->areas, node, nnode, area))
+    for (ALL_LIST_ELEMENTS (ospf->areas, node, nnode, area)) /* 遍历每一个区域 */
     {
         if (listcount (area->oiflist))
         {
@@ -541,7 +541,7 @@ ospf_check_abr_status (struct ospf *ospf)
     {
         case OSPF_ABR_SHORTCUT:
         case OSPF_ABR_STAND:
-            if (areas_act_attached > 1)
+            if (areas_act_attached > 1) /* 要有多个区域 */
                 SET_FLAG (new_flags, OSPF_FLAG_ABR);
             else
                 UNSET_FLAG (new_flags, OSPF_FLAG_ABR);
@@ -566,7 +566,7 @@ ospf_check_abr_status (struct ospf *ospf)
 
     if (new_flags != ospf->flags)
     {
-        ospf_spf_calculate_schedule (ospf, SPF_FLAG_ABR_STATUS_CHANGE);
+        ospf_spf_calculate_schedule (ospf, SPF_FLAG_ABR_STATUS_CHANGE); /* 重新计算路由 */
         if (IS_DEBUG_OSPF_EVENT)
             zlog_debug ("ospf_check_abr_status(): new router flags: %x",new_flags);
         ospf->flags = new_flags;
