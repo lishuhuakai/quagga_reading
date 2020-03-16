@@ -1201,10 +1201,11 @@ ospf_network_lsa_update (struct ospf_interface *oi)
     return;
 }
 
+/* 网络lsa的刷新 */
 static struct ospf_lsa *
 ospf_network_lsa_refresh (struct ospf_lsa *lsa)
 {
-    struct ospf_area *area = lsa->area;
+    struct ospf_area *area = lsa->area; /* 网络lsa所属的区域 */
     struct ospf_lsa *new, *new2;
     struct ospf_if_params *oip;
     struct ospf_interface *oi;
@@ -1237,13 +1238,16 @@ ospf_network_lsa_refresh (struct ospf_lsa *lsa)
 
     oip = ospf_lookup_if_params (oi->ifp, oi->address->u.prefix4);
     assert (oip != NULL);
+	/* 序列号在原有的lsa的基础上加1 */
     oip->network_lsa_seqnum = new->data->ls_seqnum = lsa_seqnum_increment (lsa);
 
     new2 = ospf_lsa_install (area->ospf, oi, new);
 
     assert (new2 == new);
 
-    /* Flood LSA through aera. */
+    /* Flood LSA through aera. 
+	 * 在整个区域内洪泛
+	 */
     ospf_flood_through_area (area, NULL, new);
 
     if (IS_DEBUG_OSPF (lsa, LSA_GENERATE))
@@ -1486,7 +1490,9 @@ ospf_summary_asbr_lsa_new (struct ospf_area *area, struct prefix *p,
     return new;
 }
 
-/* Originate summary-ASBR-LSA. */
+/* Originate summary-ASBR-LSA.
+ * 始发 asbr汇总lsa
+ */
 struct ospf_lsa *
 ospf_summary_asbr_lsa_originate (struct prefix_ipv4 *p, u_int32_t metric,
                                  struct ospf_area *area)
@@ -1529,6 +1535,7 @@ ospf_summary_asbr_lsa_originate (struct prefix_ipv4 *p, u_int32_t metric,
     return new;
 }
 
+/* type4 asbr汇总lsa */
 static struct ospf_lsa*
 ospf_summary_asbr_lsa_refresh (struct ospf *ospf, struct ospf_lsa *lsa)
 {
@@ -1550,7 +1557,9 @@ ospf_summary_asbr_lsa_refresh (struct ospf *ospf, struct ospf_lsa *lsa)
 
     ospf_lsa_install (ospf, NULL, new);
 
-    /* Flood LSA through area. */
+    /* Flood LSA through area.
+     * 在整个区域内洪泛
+     */
     ospf_flood_through_area (new->area, NULL, new);
 
     if (IS_DEBUG_OSPF (lsa, LSA_GENERATE))
@@ -2384,7 +2393,9 @@ ospf_external_lsa_refresh_type (struct ospf *ospf, u_char type, int force)
                     }
 }
 
-/* Refresh AS-external-LSA. */
+/* Refresh AS-external-LSA. 
+ * 刷新 AS-external-LSA 自主系统外部lsa
+ */
 struct ospf_lsa *
 ospf_external_lsa_refresh (struct ospf *ospf, struct ospf_lsa *lsa,
                            struct external_info *ei, int force)
@@ -2818,7 +2829,7 @@ ospf_lsa_install (struct ospf *ospf, struct ospf_interface *oi,
         case OSPF_ROUTER_LSA: /* type1 路由器lsa */
             new = ospf_router_lsa_install (ospf, lsa, rt_recalc);
             break;
-        case OSPF_NETWORK_LSA:
+        case OSPF_NETWORK_LSA: /* type2 网络lsa */
             assert (oi);
             new = ospf_network_lsa_install (ospf, oi, lsa, rt_recalc);
             break;
@@ -3723,7 +3734,7 @@ ospf_lsa_refresh (struct ospf *ospf, struct ospf_lsa *lsa)
         case OSPF_ASBR_SUMMARY_LSA:
             new = ospf_summary_asbr_lsa_refresh (ospf, lsa);
             break;
-        case OSPF_AS_EXTERNAL_LSA:
+        case OSPF_AS_EXTERNAL_LSA: /* type5 外部导入的lsa */
             /* Translated from NSSA Type-5s are refreshed when
              * from refresh of Type-7 - do not refresh these directly.
              */
@@ -3746,6 +3757,9 @@ ospf_lsa_refresh (struct ospf *ospf, struct ospf_lsa *lsa)
     return new;
 }
 
+/* 将lsa注册到ospf实例的刷新链表上去
+ * 一般而言,lsa是本交换机自己产生的,加入到刷新链表,主要是为了定时洪泛此lsa
+ */
 void
 ospf_refresher_register_lsa (struct ospf *ospf, struct ospf_lsa *lsa)
 {
@@ -3810,6 +3824,7 @@ ospf_refresher_unregister_lsa (struct ospf *ospf, struct ospf_lsa *lsa)
     }
 }
 
+/* lsa的刷新 */
 int
 ospf_lsa_refresh_walker (struct thread *t)
 {
@@ -3818,7 +3833,7 @@ ospf_lsa_refresh_walker (struct thread *t)
     struct ospf *ospf = THREAD_ARG (t);
     struct ospf_lsa *lsa;
     int i;
-    struct list *lsa_to_refresh = list_new ();
+    struct list *lsa_to_refresh = list_new (); /* 待刷新的lsa */
 
     if (IS_DEBUG_OSPF (lsa, LSA_REFRESH))
         zlog_debug ("LSA[Refresh]:ospf_lsa_refresh_walker(): start");
@@ -3828,7 +3843,9 @@ ospf_lsa_refresh_walker (struct thread *t)
 
     /* Note: if clock has jumped backwards, then time change could be negative,
        so we are careful to cast the expression to unsigned before taking
-       modulus. */
+       modulus. 
+	* 注意,如果时间被修改过,调前了,time change可能为负数,因此我们做得很小心
+    */
     ospf->lsa_refresh_queue.index =
         ((unsigned long)(ospf->lsa_refresh_queue.index +
                          (quagga_time (NULL) - ospf->lsa_refresher_started)
@@ -3840,7 +3857,7 @@ ospf_lsa_refresh_walker (struct thread *t)
                     ospf->lsa_refresh_queue.index);
 
     for (; i != ospf->lsa_refresh_queue.index;
-         i = (i + 1) % OSPF_LSA_REFRESHER_SLOTS)
+         i = (i + 1) % OSPF_LSA_REFRESHER_SLOTS) /* OSPF_LSA_REFRESHER_SLOTS是一次处理的数据量 */
     {
         if (IS_DEBUG_OSPF (lsa, LSA_REFRESH))
             zlog_debug ("LSA[Refresh]: ospf_lsa_refresh_walker(): "
@@ -3869,7 +3886,7 @@ ospf_lsa_refresh_walker (struct thread *t)
             list_free (refresh_list);
         }
     }
-
+	/* 下一次刷新的定时器 */
     ospf->t_lsa_refresher = thread_add_timer (master, ospf_lsa_refresh_walker,
                             ospf, ospf->lsa_refresh_interval);
     ospf->lsa_refresher_started = quagga_time (NULL);

@@ -207,14 +207,15 @@ ospf_area_range_set (struct ospf *ospf, struct in_addr area_id,
     struct ospf_area *area;
     struct ospf_area_range *range;
     int ret = OSPF_AREA_ID_FORMAT_ADDRESS;
-
-    area = ospf_area_get (ospf, area_id, ret);
+	
+    area = ospf_area_get (ospf, area_id, ret); /* 获得区域 */
     if (area == NULL)
         return 0;
 
     range = ospf_area_range_lookup (area, p);
     if (range != NULL)
     {
+    	/* 通告和不通告的状态发生了切换 */
         if ((CHECK_FLAG (range->flags, OSPF_AREA_RANGE_ADVERTISE)
              && !CHECK_FLAG (advertise, OSPF_AREA_RANGE_ADVERTISE))
             || (!CHECK_FLAG (range->flags, OSPF_AREA_RANGE_ADVERTISE)
@@ -1405,23 +1406,23 @@ ospf_abr_unapprove_summaries (struct ospf *ospf)
     if (IS_DEBUG_OSPF_EVENT)
         zlog_debug ("ospf_abr_unapprove_summaries(): Start");
 
-    for (ALL_LIST_ELEMENTS_RO (ospf->areas, node, area))
+    for (ALL_LIST_ELEMENTS_RO (ospf->areas, node, area)) /* 遍历所有区域 */
     {
         if (IS_DEBUG_OSPF_EVENT)
             zlog_debug ("ospf_abr_unapprove_summaries(): "
                         "considering area %s",
                         inet_ntoa (area->area_id));
-        LSDB_LOOP (SUMMARY_LSDB (area), rn, lsa)
+        LSDB_LOOP (SUMMARY_LSDB (area), rn, lsa) /* 遍历网络汇总lsa */
         if (ospf_lsa_is_self_originated (ospf, lsa)) /* 自己产生的summary-lsa */
         {
             if (IS_DEBUG_OSPF_EVENT)
                 zlog_debug ("ospf_abr_unapprove_summaries(): "
                             "approved unset on summary link id %s",
                             inet_ntoa (lsa->data->id));
-            UNSET_FLAG (lsa->flags, OSPF_LSA_APPROVED);
+            UNSET_FLAG (lsa->flags, OSPF_LSA_APPROVED); /* 去掉LSA_APPROVED标志 */
         }
 
-        LSDB_LOOP (ASBR_SUMMARY_LSDB (area), rn, lsa)
+        LSDB_LOOP (ASBR_SUMMARY_LSDB (area), rn, lsa) /* 遍历asbr汇总lsa */
         if (ospf_lsa_is_self_originated (ospf, lsa))
         {
             if (IS_DEBUG_OSPF_EVENT)
@@ -1485,7 +1486,7 @@ ospf_abr_announce_aggregates (struct ospf *ospf)
         if (IS_DEBUG_OSPF_EVENT)
             zlog_debug ("ospf_abr_announce_aggregates(): looking at area %s",
                         inet_ntoa (area->area_id));
-
+		/* 看是否满足汇聚要求 */
         for (rn = route_top (area->ranges); rn; rn = route_next (rn)) /* 遍历路由汇聚 */
             if ((range =  rn->info))
             {
@@ -1717,7 +1718,7 @@ ospf_abr_remove_unapproved_summaries (struct ospf *ospf)
         LSDB_LOOP (SUMMARY_LSDB (area), rn, lsa)
         if (ospf_lsa_is_self_originated (ospf, lsa))
             if (!CHECK_FLAG (lsa->flags, OSPF_LSA_APPROVED))
-                ospf_lsa_flush_area (lsa, area);
+                ospf_lsa_flush_area (lsa, area); /* 将此条lsa老化掉 */
 
         LSDB_LOOP (ASBR_SUMMARY_LSDB (area), rn, lsa)
         if (ospf_lsa_is_self_originated (ospf, lsa))
@@ -1839,7 +1840,9 @@ ospf_abr_nssa_task (struct ospf *ospf) /* called only if any_nssa */
 }
 
 /* This is the function taking care about ABR stuff, i.e.
-   summary-LSA origination and flooding. */
+   summary-LSA origination and flooding. 
+ * 这个函数主要处理ABR相关事宜,
+ */
 void
 ospf_abr_task (struct ospf *ospf)
 {
@@ -1858,7 +1861,7 @@ ospf_abr_task (struct ospf *ospf)
     ospf_abr_unapprove_summaries (ospf);
 
     if (IS_DEBUG_OSPF_EVENT)
-        zlog_debug ("ospf_abr_task(): prepare aggregates");
+        zlog_debug ("ospf_abr_task(): prepare aggregates"); /* 准备汇聚 */
     ospf_abr_prepare_aggregates (ospf);
 
     if (IS_OSPF_ABR (ospf))

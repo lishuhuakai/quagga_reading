@@ -405,6 +405,7 @@ ospf_terminate (void)
      */
 }
 
+/* ospfÊµÀıµÄÏú»Ù */
 void
 ospf_finish (struct ospf *ospf)
 {

@@ -555,7 +555,7 @@ DEFUN (ospf_area_range,
     int format;
     u_int32_t cost;
 
-    VTY_GET_OSPF_AREA_ID (area_id, format, argv[0]);
+    VTY_GET_OSPF_AREA_ID (area_id, format, argv[0]); /* 提取出area_id */
     VTY_GET_IPV4_PREFIX ("area range", p, argv[1]);
 
     ospf_area_range_set (ospf, area_id, &p, OSPF_AREA_RANGE_ADVERTISE);
@@ -2100,7 +2100,7 @@ DEFUN (no_ospf_area_authentication,
     return CMD_SUCCESS;
 }
 
-
+/* 设定abr类型 */
 DEFUN (ospf_abr_type,
        ospf_abr_type_cmd,
        "ospf abr-type (cisco|ibm|shortcut|standard)",

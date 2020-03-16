@@ -62,10 +62,11 @@ struct route_standard
     struct lsa_header *origin;
 
     /* Associated Area. */
+	/* 路由所属的区域 */
     struct in_addr area_id;   /* The area the route belongs to */
 
     /*  Area Type */
-    int external_routing;
+    int external_routing; /* 区域类型 */
 
     /* Optional Capability. */
     u_char options;       /* Get from LSA header. */

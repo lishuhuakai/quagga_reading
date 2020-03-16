@@ -1,5 +1,6 @@
 /*
  * OSPF ABR functions.
+ * 区域边界路由器相关的函数
  * Copyright (C) 1999 Alex Zinin
  *
  * This file is part of GNU Zebra.
