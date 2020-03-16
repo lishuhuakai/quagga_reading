@@ -296,6 +296,7 @@ ospf_flood (struct ospf *ospf, struct ospf_neighbor *nbr,
                 ospf_ls_retransmit_delete_nbr_as (ospf, current);
                 break;
             default:
+                /* 因为new更新,需要将current从重传列表中移除 */
                 ospf_ls_retransmit_delete_nbr_area (nbr->oi->area, current);
                 break;
         }
@@ -311,12 +312,13 @@ ospf_flood (struct ospf *ospf, struct ospf_neighbor *nbr,
        timestamp the new LSA with the current time.  The flooding
        procedure cannot overwrite the newly installed LSA until
        MinLSArrival seconds have elapsed. */
-
+    /* 将新的LSA安装到lsdb中(替换当前数据库版本),这有可能会导致路由表重新计算 */
     if (! (new = ospf_lsa_install (ospf, nbr->oi, new)))
         return -1; /* unknown LSA type or any other error condition */
 
     /* Acknowledge the receipt of the LSA by sending a Link State
        Acknowledgment packet back out the receiving interface. */
+    /* 确认lsa,通过发送一个确认包 */
     if (lsa_ack_flag)
         ospf_flood_delayed_lsa_ack (nbr, new);
 

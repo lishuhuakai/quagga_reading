@@ -172,7 +172,7 @@ ospf_lsa_refresh_delay (struct ospf_lsa *lsa)
     return delay;
 }
 
-
+/* 获得lsa的老化时间 */
 int
 get_age (struct ospf_lsa *lsa)
 {
@@ -1245,7 +1245,7 @@ ospf_network_lsa_refresh (struct ospf_lsa *lsa)
 
     assert (new2 == new);
 
-    /* Flood LSA through aera. 
+    /* Flood LSA through aera.
 	 * 在整个区域内洪泛
 	 */
     ospf_flood_through_area (area, NULL, new);
@@ -2393,7 +2393,7 @@ ospf_external_lsa_refresh_type (struct ospf *ospf, u_char type, int force)
                     }
 }
 
-/* Refresh AS-external-LSA. 
+/* Refresh AS-external-LSA.
  * 刷新 AS-external-LSA 自主系统外部lsa
  */
 struct ospf_lsa *
@@ -2904,6 +2904,7 @@ ospf_lsa_install (struct ospf *ospf, struct ospf_interface *oi,
 }
 
 
+/* 检查邻居的状态 */
 int
 ospf_check_nbr_status (struct ospf *ospf)
 {
@@ -3157,7 +3158,7 @@ ospf_lsa_maxage_walker (struct thread *thread)
 
     ospf->t_maxage_walker = NULL;
 
-    for (ALL_LIST_ELEMENTS (ospf->areas, node, nnode, area))
+    for (ALL_LIST_ELEMENTS (ospf->areas, node, nnode, area)) /* 遍历区域 */
     {
         LSDB_LOOP (ROUTER_LSDB (area), rn, lsa)
         ospf_lsa_maxage_walker_remover (ospf, lsa);
@@ -3843,7 +3844,7 @@ ospf_lsa_refresh_walker (struct thread *t)
 
     /* Note: if clock has jumped backwards, then time change could be negative,
        so we are careful to cast the expression to unsigned before taking
-       modulus. 
+       modulus.
 	* 注意,如果时间被修改过,调前了,time change可能为负数,因此我们做得很小心
     */
     ospf->lsa_refresh_queue.index =

@@ -1792,7 +1792,7 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
      * Numbers in parentheses, e.g. (1), (2), etc., and the corresponding
      * text below are from the steps in RFC 2328, Section 13.
      */
-    for (ALL_LIST_ELEMENTS (lsas, node, nnode, lsa))
+    for (ALL_LIST_ELEMENTS (lsas, node, nnode, lsa)) /* 遍历lsa */
     {
         struct ospf_lsa *ls_ret, *current;
         int ret = 1;
@@ -1949,6 +1949,7 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
          * Link State ID is one of the router's own IP interface addresses but whose
          * Advertising Router is not equal to the router's own Router ID
          * According to RFC 2328 12.4.2 and 13.4 this LSA should be flushed.
+         * 有可能接收到的LSA是自己产生的网络lsa,只是route ID发生了更改.
          */
 
         if(lsa->data->type == OSPF_NETWORK_LSA) /* 网络lsa */
@@ -1961,11 +1962,11 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
             {
                 if(out_if == NULL)
                     break;
-
+                /* 遍历接口,如果有一个接口的ip和lsa的对的上 */
                 if((IPV4_ADDR_SAME(&out_if->address->u.prefix4, &lsa->data->id)) &&
                    (!(IPV4_ADDR_SAME(&oi->ospf->router_id, &lsa->data->adv_router))))
                 {
-                    if(out_if->network_lsa_self)
+                    if (out_if->network_lsa_self)
                     {
                         ospf_lsa_flush_area(lsa,out_if->area);
                         if(IS_DEBUG_OSPF_EVENT)
@@ -2071,7 +2072,9 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
          acknowledging it. (In this case, the LSA's LS sequence number is
          wrapping, and the MaxSequenceNumber LSA must be completely
          flushed before any new LSA instance can be introduced). */
-
+        /* 数据库中的lsa更新,如果数据库中的版本老化时间达到了MaxAge,而且LS sequence number
+         * 等于MaxSequenceNumber,简单丢弃收到的lsa而不用确认, 因为此时lsa序列号即将溢出, 拥有
+         * MaxSequenceNumber的LSA必须老化掉,新的lSA实例才能存入 */
         else if (ret > 0)  /* Database copy is more recent */
         {
             if (IS_LSA_MAXAGE (current) &&
@@ -2087,6 +2090,9 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
                database copy of the LSA on the neighbor's link state
                retransmission list, and do not acknowledge the received (less
                recent) LSA instance. */
+             /* 否则的话,只要数据库中的版本还没有发送链路状态更新,在MinLsArrival秒之内,
+              * 可以将新的拷贝用链路状态更新包包裹起来发给邻居,链路状态更新包应该直接发给邻居
+              * 也不要将lsa加入邻居的链路状态重传列表中,也不要确认收到的lsa */
             else
             {
                 struct timeval now;
