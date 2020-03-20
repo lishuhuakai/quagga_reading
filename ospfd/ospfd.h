@@ -90,6 +90,7 @@ struct ospf_master
     struct list *iflist;
 
     /* Redistributed external information. */
+    /* 用于记录导入的外部路由信息,路由可能有多种来源,每种来源对应一个route_table */
     struct route_table *external_info[ZEBRA_ROUTE_MAX + 1];
 #define EXTERNAL_INFO(T)      om->external_info[T]
 
@@ -161,6 +162,9 @@ struct ospf
 #define DEFAULT_ORIGINATE_ZEBRA     1
 #define DEFAULT_ORIGINATE_ALWAYS    2
     u_int32_t ref_bandwidth;      /* Reference Bandwidth (Kbps). */
+    /* 记录我们手动配置的网段信息
+     * network a.b.c.d/m area xxx之类的命令中的网段会被放入这里面
+     */
     struct route_table *networks;         /* OSPF config networks. */
     struct list *vlinks;                  /* Configured Virtual-Links. */
     struct list *areas;                   /* OSPF areas. */
@@ -250,6 +254,7 @@ struct ospf
     route_tag_t dtag [ZEBRA_ROUTE_MAX + 1];
 
     /* For redistribute route map. */
+    /* route map,主要用于重新设定matric等信息 */
     struct
     {
         char *name;

@@ -216,6 +216,9 @@ ospf_external_info_lookup (u_char type, struct prefix_ipv4 *p)
     return NULL;
 }
 
+/* 根据网段信息查找lsa
+ * @param p 网段信息(代表一个网络)
+ */
 struct ospf_lsa *
 ospf_external_info_find_lsa (struct ospf *ospf,
                              struct prefix_ipv4 *p)

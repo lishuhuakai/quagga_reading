@@ -5910,10 +5910,10 @@ DEFUN (ip_ospf_area,
     struct ospf_if_params *params;
 
     VTY_GET_OSPF_AREA_ID (area_id, format, argv[0]); /* 获得area id */
-
+    /* 通过addr来获取对应的接口对应ip的参数,放入params中 */
     OSPF_VTY_GET_IF_PARAMS(ifp, params, 1, addr, VTY_SET);
 
-    if (OSPF_IF_PARAM_CONFIGURED(params, if_area))
+    if (OSPF_IF_PARAM_CONFIGURED(params, if_area)) /* 接口已经属于某个区域了,不允许变更 */
     {
         vty_out (vty, "There is already an interface area statement.%s",
                  VTY_NEWLINE);
@@ -5980,12 +5980,12 @@ DEFUN (ospf_redistribute_source,
         return CMD_WARNING; /* should not happen */
 
     /* Get distribute source. */
-    source = proto_redistnum(AFI_IP, argv[0]);
+    source = proto_redistnum(AFI_IP, argv[0]); /* 路由的来源 */
     if (source < 0 || source == ZEBRA_ROUTE_OSPF)
         return CMD_WARNING;
 
     /* Get metric value. */
-    if (argv[1] != NULL)
+    if (argv[1] != NULL) /* 度量值 */
         if (!str2metric (argv[1], &metric))
             return CMD_WARNING;
 

@@ -207,7 +207,7 @@ ospf_area_range_set (struct ospf *ospf, struct in_addr area_id,
     struct ospf_area *area;
     struct ospf_area_range *range;
     int ret = OSPF_AREA_ID_FORMAT_ADDRESS;
-	
+
     area = ospf_area_get (ospf, area_id, ret); /* 获得区域 */
     if (area == NULL)
         return 0;
@@ -1395,6 +1395,8 @@ ospf_abr_unapprove_translates (struct ospf *ospf) /* For NSSA Translations */
         zlog_debug ("ospf_abr_unapprove_translates(): Stop");
 }
 
+/* 将自己产生的summary LSA标记为unapprove状态
+ */
 static void
 ospf_abr_unapprove_summaries (struct ospf *ospf)
 {
@@ -1698,6 +1700,7 @@ ospf_abr_remove_unapproved_translates (struct ospf *ospf)
         zlog_debug ("ospf_abr_remove_unapproved_translates(): Stop");
 }
 
+
 static void
 ospf_abr_remove_unapproved_summaries (struct ospf *ospf)
 {
@@ -1722,7 +1725,7 @@ ospf_abr_remove_unapproved_summaries (struct ospf *ospf)
 
         LSDB_LOOP (ASBR_SUMMARY_LSDB (area), rn, lsa)
         if (ospf_lsa_is_self_originated (ospf, lsa))
-            if (!CHECK_FLAG (lsa->flags, OSPF_LSA_APPROVED))
+            if (!CHECK_FLAG (lsa->flags, OSPF_LSA_APPROVED)) /* 如果不带approve标记,立马老化 */
                 ospf_lsa_flush_area (lsa, area);
     }
 
@@ -1840,7 +1843,7 @@ ospf_abr_nssa_task (struct ospf *ospf) /* called only if any_nssa */
 }
 
 /* This is the function taking care about ABR stuff, i.e.
-   summary-LSA origination and flooding. 
+   summary-LSA origination and flooding.
  * 这个函数主要处理ABR相关事宜,
  */
 void
@@ -1876,10 +1879,14 @@ ospf_abr_task (struct ospf *ospf)
 
         if (IS_DEBUG_OSPF_EVENT)
             zlog_debug ("ospf_abr_task(): announce aggregates");
+        /* 这里说明一句,前面的ospf_abr_unapprove_summaries将所有自己产生的type-5以及type-7
+         * 的lsa标记为了unapproved状态,下面的函数进行相关的检查,检查通过的lsa会标记为approved
+         */
         ospf_abr_announce_aggregates (ospf);
 
         if (IS_DEBUG_OSPF_EVENT)
             zlog_debug ("ospf_abr_task(): announce stub defaults");
+        /* 给stub区域通告默认路由 */
         ospf_abr_announce_stub_defaults (ospf);
     }
 

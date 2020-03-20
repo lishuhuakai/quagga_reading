@@ -30,7 +30,7 @@ struct route_map_set_values
 };
 
 /* Redistributed external information.
- * 重分配外部路由信息
+ * 重发布外部路由信息
  */
 struct external_info
 {
@@ -38,13 +38,13 @@ struct external_info
   u_char type;
 
   /* Prefix. */
-  struct prefix_ipv4 p;
+  struct prefix_ipv4 p; /* 网络信息 */
 
   /* Interface index. */
-  ifindex_t ifindex;
+  ifindex_t ifindex; /* 接口id */
 
   /* Nexthop address. */
-  struct in_addr nexthop;
+  struct in_addr nexthop; /* 下一跳信息 */
 
   /* Additional Route tag: this is the wire type */
   u_int32_t tag;

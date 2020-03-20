@@ -784,6 +784,7 @@ add_ospf_interface (struct connected *co, struct ospf_area *area)
         ospf_if_up (oi);
 }
 
+/* 更新相连的重定向 */
 static void
 update_redistributed (struct ospf *ospf, int add_to_ospf)
 {
@@ -822,6 +823,8 @@ ospf_network_free (struct ospf *ospf, struct ospf_network *network)
 
 /*
  * 将某个网络设置为某个区域
+ * @param p 前缀
+ * @param area_id 区域id
  */
 int
 ospf_network_set (struct ospf *ospf, struct prefix_ipv4 *p,
@@ -841,7 +844,7 @@ ospf_network_set (struct ospf *ospf, struct prefix_ipv4 *p,
     }
 
     rn->info = network = ospf_network_new (area_id, ret);
-    area = ospf_area_get (ospf, area_id, ret);
+    area = ospf_area_get (ospf, area_id, ret); /* 通过area_id查找区域,没找到就构建一个 */
 
     /* Run network config now. */
     ospf_network_run ((struct prefix *)p, area);
@@ -909,6 +912,7 @@ ospf_interface_area_set (struct interface *ifp)
     return;
 }
 
+/* ifp对应的某个ip不再加入某个区域 */
 void
 ospf_interface_area_unset (struct interface *ifp)
 {
@@ -919,7 +923,7 @@ ospf_interface_area_unset (struct interface *ifp)
         return; /* Ospf not ready yet */
 
     /* Find interfaces that may need to be removed. */
-    for (rn_oi = route_top (IF_OIFS (ifp)); rn_oi; rn_oi = route_next (rn_oi))
+    for (rn_oi = route_top (IF_OIFS (ifp)); rn_oi; rn_oi = route_next (rn_oi)) /* 遍历接口的多个ip */
     {
         struct ospf_interface *oi;
 
@@ -955,12 +959,12 @@ ospf_update_interface_area (struct connected *co, struct ospf_area *area)
     struct ospf_interface *oi = ospf_if_table_lookup (co->ifp, co->address);
 
     /* nothing to be done case */
-    if (oi && oi->area == area)
+    if (oi && oi->area == area) /* 如果接口已经属于某个区域了,什么也不做 */
         return;
 
-    if (oi)
+    if (oi) /* 接口现在属于另外一个区域,先销毁 */
         ospf_if_free (oi);
-
+    /* 重新构建一个ospf区域,加入区域 */
     add_ospf_interface (co, area);
 }
 
@@ -993,12 +997,13 @@ ospf_network_run_subnet (struct ospf *ospf, struct connected *co,
     /* Try determine the appropriate area for this interface + address
      * Start by checking interface config
      */
+    /* 获取拥有匹配p的地址的接口的配置参数 */
     if (!(params = ospf_lookup_if_params (co->ifp, co->address->u.prefix4)))
         params = IF_DEF_PARAMS (co->ifp);
 
-    if (OSPF_IF_PARAM_CONFIGURED(params, if_area))
+    if (OSPF_IF_PARAM_CONFIGURED(params, if_area)) /* 如果配置了区域的话 */
         area = (ospf_area_get (ospf, params->if_area,
-                               OSPF_AREA_ID_FORMAT_ADDRESS));
+                               OSPF_AREA_ID_FORMAT_ADDRESS)); /* 获得对应的区域 */
 
     /* If we've found an interface and/or addr specific area, then we're
      * done
@@ -1065,6 +1070,10 @@ ospf_network_run_interface (struct ospf *ospf, struct interface *ifp,
         ospf_network_run_subnet (ospf, co, p, given_area);
 }
 
+/* 让ip地址匹配前缀p的接口运行ospf
+ * @param p 待匹配的前缀
+ * @param area 区域
+ */
 static void
 ospf_network_run (struct prefix *p, struct ospf_area *area)
 {
@@ -1076,7 +1085,7 @@ ospf_network_run (struct prefix *p, struct ospf_area *area)
         ospf_router_id_update (area->ospf);
 
     /* Get target interface. */
-    for (ALL_LIST_ELEMENTS_RO (om->iflist, node, ifp))
+    for (ALL_LIST_ELEMENTS_RO (om->iflist, node, ifp)) /* 遍历路由器的接口(三层接口) */
         ospf_network_run_interface (area->ospf, ifp, p, area);
 }
 
@@ -1107,6 +1116,7 @@ ospf_ls_upd_queue_empty (struct ospf_interface *oi)
     }
 }
 
+/* 更新接口参数 */
 void
 ospf_if_update (struct ospf *ospf, struct interface *ifp)
 {

@@ -598,6 +598,11 @@ ospf_is_type_redistributed (int type)
            vrf_bitmap_check (zclient->redist[type], VRF_DEFAULT);
 }
 
+/* 路由重发布
+ * @param type 路由来源
+ * @param mtype metric的类型
+ * @param mvalue metric的值
+ */
 int
 ospf_redistribute_set (struct ospf *ospf, int type, int mtype, int mvalue)
 {
@@ -612,7 +617,7 @@ ospf_redistribute_set (struct ospf *ospf, int type, int mtype, int mvalue)
         }
         if (mvalue != ospf->dmetric[type].value)
         {
-            ospf->dmetric[type].value = mvalue;
+            ospf->dmetric[type].value = mvalue; /* 更新metric值 */
             force = LSA_REFRESH_FORCE;
         }
 
@@ -635,7 +640,7 @@ ospf_redistribute_set (struct ospf *ospf, int type, int mtype, int mvalue)
         zlog_debug ("Redistribute[%s]: Start  Type[%d], Metric[%d]",
                     ospf_redist_string(type),
                     metric_type (ospf, type), metric_value (ospf, type));
-
+    /* 既然导入了外部路由,自然此路由器就是ASBR */
     ospf_asbr_status_update (ospf, ++ospf->redistribute);
 
     return CMD_SUCCESS;
@@ -729,11 +734,14 @@ ospf_redistribute_default_unset (struct ospf *ospf)
     return CMD_SUCCESS;
 }
 
+/* 外部导入路由检查,看是否能为其创建lsa
+ */
 static int
 ospf_external_lsa_originate_check (struct ospf *ospf,
                                    struct external_info *ei)
 {
     /* If prefix is multicast, then do not originate LSA. */
+    /* 多播地址,不能创建LSA */
     if (IN_MULTICAST (htonl (ei->p.prefix.s_addr)))
     {
         zlog_info ("LSA[Type5:%s]: Not originate AS-external-LSA, "
@@ -774,6 +782,7 @@ ospf_redistribute_check (struct ospf *ospf,
 {
     struct route_map_set_values save_values;
     struct prefix_ipv4 *p = &ei->p;
+    /* 路由类型 */
     u_char type = is_prefix_default (&ei->p) ? DEFAULT_ROUTE : ei->type;
 
     if (changed)
@@ -786,7 +795,7 @@ ospf_redistribute_check (struct ospf *ospf,
     if (type == ZEBRA_ROUTE_CONNECT &&
         !ospf_distribute_check_connected (ospf, ei))
         return 0;
-
+    /* 检查过滤列表,如果路由被过滤了,就不创建 */
     if (!DEFAULT_ROUTE_TYPE (type) && DISTRIBUTE_NAME (ospf, type))
         /* distirbute-list exists, but access-list may not? */
         if (DISTRIBUTE_LIST (ospf, type))

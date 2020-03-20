@@ -2178,6 +2178,7 @@ ospf_ls_ack (struct ip *iph, struct ospf_header *ospfh,
 
 /*
  * 接收ospf数据包
+ * @param ifp 用于记录收包的接口
  */
 static struct stream *
 ospf_recv_packet (int fd, struct interface **ifp, struct stream *ibuf)
@@ -2245,7 +2246,7 @@ ospf_recv_packet (int fd, struct interface **ifp, struct stream *ibuf)
     ip_len = ntohs(iph->ip_len) + (iph->ip_hl << 2);
 #endif
 
-    ifindex = getsockopt_ifindex (AF_INET, &msgh);
+    ifindex = getsockopt_ifindex (AF_INET, &msgh); /* 从头部中获取 */
     /* 根据接口的索引值来查找接口信息 */
     *ifp = if_lookup_by_index (ifindex);
 
@@ -2798,7 +2799,7 @@ ospf_read (struct thread *thread)
     struct ip *iph;
     struct ospf_header *ospfh;
     u_int16_t length;
-    struct interface *ifp;
+    struct interface *ifp; /* 记录对应的收包接口 */
 
     /* first of all get interface pointer. */
     ospf = THREAD_ARG (thread);
@@ -2851,6 +2852,7 @@ ospf_read (struct thread *thread)
     /* Now it is safe to access all fields of OSPF packet header. */
 
     /* associate packet with ospf interface */
+    /* 将包和对应的ospf实例对应起来 */
     oi = ospf_if_lookup_recv_if (ospf, iph->ip_src, ifp);
 
     /* ospf_verify_header() relies on a valid "oi" and thus can be called only

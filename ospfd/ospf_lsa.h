@@ -73,13 +73,14 @@ struct ospf_lsa
     /* LSA origination flag. */
     u_char flags; /* lsa来源标记 */
 #define OSPF_LSA_SELF         0x01 /* 自己产生的 */
-#define OSPF_LSA_SELF_CHECKED     0x02
-#define OSPF_LSA_RECEIVED     0x04
-#define OSPF_LSA_APPROVED     0x08
+#define OSPF_LSA_SELF_CHECKED     0x02 /* 已经检查过的lsa会打上此标记 */
+#define OSPF_LSA_RECEIVED     0x04 /* 表示此lsa从别的路由器处接收到 */
+/* OSPF_LSA_APPROVED这个标记仅仅由Type-3和Type-4的LSA使用 */
+#define OSPF_LSA_APPROVED     0x08 /* 检查通过的lsa会被标记为approved,unapprved的lsa会被老化 */
 #define OSPF_LSA_DISCARD      0x10
-#define OSPF_LSA_LOCAL_XLT    0x20
+#define OSPF_LSA_LOCAL_XLT    0x20 /* 表示LSA从type-7转换而来 */
 #define OSPF_LSA_PREMATURE_AGE    0x40
-#define OSPF_LSA_IN_MAXAGE    0x80
+#define OSPF_LSA_IN_MAXAGE    0x80 /* 表示LSA已经老化 */
 
     /* LSA data. */
     struct lsa_header *data;
@@ -201,7 +202,7 @@ struct summary_lsa
 /* OSPF AS-external-LSAs structure. */
 #define OSPF_AS_EXTERNAL_LSA_MIN_SIZE             16U /* w/1 TOS forwarding block */
 /*
- * 自主系统外部LSA
+ * 自主系统外部LSA,也就是这里的路由信息,事实上是外部导入的
  */
 struct as_external_lsa
 {

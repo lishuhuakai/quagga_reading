@@ -1731,6 +1731,7 @@ ospf_external_lsa_body_set (struct stream *s, struct external_info *ei,
 }
 
 /* Create new external-LSA. */
+/* 创建type5类型的lsa */
 static struct ospf_lsa *
 ospf_external_lsa_new (struct ospf *ospf,
                        struct external_info *ei, struct in_addr *old_id)
@@ -1926,7 +1927,9 @@ ospf_lsa_translated_nssa_new (struct ospf *ospf,
     return new;
 }
 
-/* Originate Translated Type-5 for supplied Type-7 NSSA LSA */
+/* Originate Translated Type-5 for supplied Type-7 NSSA LSA
+ * 将Type-7的NSSA LSA转换成Type-5类型的LSA
+ */
 struct ospf_lsa *
 ospf_translated_nssa_originate (struct ospf *ospf, struct ospf_lsa *type7)
 {
@@ -1937,7 +1940,7 @@ ospf_translated_nssa_originate (struct ospf *ospf, struct ospf_lsa *type7)
      * the OSPF_LSA_LOCAL_XLT flag, must originate by hand
      */
 
-    if ( (new = ospf_lsa_translated_nssa_new (ospf, type7)) == NULL)
+    if ((new = ospf_lsa_translated_nssa_new (ospf, type7)) == NULL)
     {
         if (IS_DEBUG_OSPF_NSSA)
             zlog_debug ("ospf_translated_nssa_originate(): Could not translate "
@@ -2078,6 +2081,7 @@ ospf_translated_nssa_refresh (struct ospf *ospf, struct ospf_lsa *type7,
     return new;
 }
 
+/* 判断前缀的形式是否为0.0.0.0/0 */
 int
 is_prefix_default (struct prefix_ipv4 *p)
 {
@@ -2371,6 +2375,9 @@ ospf_external_lsa_refresh_default (struct ospf *ospf)
     }
 }
 
+/* 刷新某种类型的lsa
+ * @param force 是否需要强制刷新
+ */
 void
 ospf_external_lsa_refresh_type (struct ospf *ospf, u_char type, int force)
 {
@@ -2379,10 +2386,12 @@ ospf_external_lsa_refresh_type (struct ospf *ospf, u_char type, int force)
 
     if (type != DEFAULT_ROUTE)
         if (EXTERNAL_INFO(type))
-            /* Refresh each redistributed AS-external-LSAs. */
+            /* Refresh each redistributed AS-external-LSAs.
+             * 刷新每一个重分布的
+             */
             for (rn = route_top (EXTERNAL_INFO (type)); rn; rn = route_next (rn))
                 if ((ei = rn->info))
-                    if (!is_prefix_default (&ei->p))
+                    if (!is_prefix_default (&ei->p)) /* 不导入默认路由 */
                     {
                         struct ospf_lsa *lsa;
 
@@ -3555,6 +3564,8 @@ ospf_flush_self_originated_lsas_now (struct ospf *ospf)
 
 /* If there is self-originated LSA, then return 1, otherwise return 0. */
 /* An interface-independent version of ospf_lsa_is_self_originated */
+/* 判断lsa是否为路由器自己产生
+ */
 int
 ospf_lsa_is_self_originated (struct ospf *ospf, struct ospf_lsa *lsa)
 {
@@ -3569,6 +3580,7 @@ ospf_lsa_is_self_originated (struct ospf *ospf, struct ospf_lsa *lsa)
     SET_FLAG (lsa->flags, OSPF_LSA_SELF_CHECKED);
 
     /* AdvRouter and Router ID is the same. */
+    /* 通告路由器的router ID和自己的router id相同 */
     if (IPV4_ADDR_SAME (&lsa->data->adv_router, &ospf->router_id))
         SET_FLAG (lsa->flags, OSPF_LSA_SELF);
 
@@ -3587,7 +3599,7 @@ ospf_lsa_is_self_originated (struct ospf *ospf, struct ospf_lsa *lsa)
                     if (IPV4_ADDR_SAME (&lsa->data->id, &oi->address->u.prefix4))
                     {
                         /* to make it easier later */
-                        SET_FLAG (lsa->flags, OSPF_LSA_SELF);
+                        SET_FLAG (lsa->flags, OSPF_LSA_SELF); /* 为了后续检查方便,打上标记 */
                         return IS_LSA_SELF (lsa);
                     }
         }
