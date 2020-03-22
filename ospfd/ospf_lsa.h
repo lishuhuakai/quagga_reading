@@ -112,7 +112,7 @@ struct ospf_lsa
     struct ospf_lsdb *lsdb;
 
     /* Related Route. */
-    void *route;
+    void *route; /* 记录相关的路由表项 */
 
     /* Refreshement List or Queue */
     int refresh_list; /* 记录此lsa在ospf的lsa_refresh_queue.qs中的哪一个链表之中 */

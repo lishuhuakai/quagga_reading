@@ -48,6 +48,8 @@
 
 /* Remove external route.
  * 移除掉某个外部路由
+ * @param ospf ospf实例
+ * @param p 待匹配的网段的信息
  */
 void
 ospf_external_route_remove (struct ospf *ospf, struct prefix_ipv4 *p)
@@ -102,7 +104,8 @@ ospf_external_route_lookup (struct ospf *ospf,
 }
 
 
-/* Add an External info for AS-external-LSA. */
+/* Add an External info for AS-external-LSA.
+ */
 struct external_info *
 ospf_external_info_new (u_char type)
 {
@@ -138,7 +141,7 @@ ospf_route_map_set_compare (struct route_map_set_values *values1,
 }
 
 /* Add an External info for AS-external-LSA.
- * 添加外部信息到AS-external-LSA中
+ * 添加外部信息到AS-external-LSA中,也就是外部路由
  */
 struct external_info *
 ospf_external_info_add (u_char type, struct prefix_ipv4 p,
@@ -217,7 +220,7 @@ ospf_external_info_lookup (u_char type, struct prefix_ipv4 *p)
 }
 
 /* 根据网段信息查找lsa
- * @param p 网段信息(代表一个网络)
+ * @param p 待匹配的网段信息(代表一个网络)
  */
 struct ospf_lsa *
 ospf_external_info_find_lsa (struct ospf *ospf,

@@ -48,7 +48,10 @@
 #include "ospfd/ospf_dump.h"
 
 /*
- * 查找对应的asbr路由
+ * 查找路由表中,是否存在一条到达asbr的路由
+ * @param ospf ospf实例
+ * @param rtrs 路由表
+ * @param asbr 待匹配的网段信息
  */
 struct ospf_route *
 ospf_find_asbr_route (struct ospf *ospf,
@@ -134,6 +137,7 @@ ospf_find_asbr_route_through_area (struct route_table *rtrs,
     return NULL;
 }
 
+/* 下一跳是直连?? */
 static void
 ospf_ase_complete_direct_routes (struct ospf_route *ro, struct in_addr nexthop)
 {
@@ -161,6 +165,9 @@ ospf_ase_forward_address_check (struct ospf *ospf, struct in_addr fwd_addr)
 }
 
 
+/* 更新(填充)到达asbr的路由信息
+ * @param metric 度量值
+ */
 static struct ospf_route *
 ospf_ase_calculate_new_route (struct ospf_lsa *lsa,
                               struct ospf_route *asbr_route, u_int32_t metric)
@@ -205,6 +212,7 @@ ospf_ase_calculate_new_route (struct ospf_lsa *lsa,
 
 #define OSPF_ASE_CALC_INTERVAL 1
 
+/* 路由计算 */
 int
 ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
 {
@@ -271,9 +279,9 @@ ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
     asbr.prefix = al->header.adv_router;
     asbr.prefixlen = IPV4_MAX_BITLEN;
     apply_mask_ipv4 (&asbr);
-
+    /* 查找到达asbr的路由信息 */
     asbr_route = ospf_find_asbr_route (ospf, ospf->new_rtrs, &asbr);
-    if (asbr_route == NULL)
+    if (asbr_route == NULL) /* 没有找到,其实就是无法到达此asbr */
     {
         if (IS_DEBUG_OSPF (lsa, LSA))
             zlog_debug ("Route[External]: Can't find originating ASBR route");
@@ -305,6 +313,11 @@ ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
          Area ID (when considered as an unsigned 32-bit integer) is
          chosen. */
 
+        /* 如果转发地址设置成了0.0.0.0,那么数据包应该转发到ASBR,如果有很多条到达ASBR
+         * 的路径,那么选择方法如下:
+         * * 如果RFC1583Compatibility设置为了disabled,
+         */
+
         /* asbr_route already contains the requested route */
     }
     else
@@ -314,6 +327,8 @@ ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
          routing table entry must specify an intra-area or inter-area
          path; if no such path exists, do nothing with the LSA and
          consider the next in the list. */
+         /* 如果转发地址不为空,在路由表中查找转发地址,匹配的路由表项必须是一个域内或者域间路由
+          * 如果不存在这样的路由, 什么也不干 */
         if (! ospf_ase_forward_address_check (ospf, al->e[0].fwd_addr))
         {
             if (IS_DEBUG_OSPF (lsa, LSA))
@@ -345,6 +360,7 @@ ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
            entry for the ASBR/forwarding address, and Y the cost
      specified in the LSA.  X is in terms of the link state
      metric, and Y is a type 1 or 2 external metric. */
+    /* X为更优的到达ASBR/转发路径 的路由条目的开销,Y是LSA中指定的开销 */
 
 
     /* (5) Look up the routing table entry for the destination N.  If
@@ -356,6 +372,11 @@ ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
      external metric type is 2, the path-type is set to type 2
      external, the link state component of the route's cost is X,
      and the type 2 cost is Y. */
+    /* 查找到达目标N的路由表条目,如果没找到,添加一条路由表项(通过As external Path到N)
+     * 如果路由表的下一条的地址和转发地址一致,那么通告路由器就是ASBR.,如果external metric类型
+     * 等于1, 那么path-type设置为type1 external, cost设置为X + Y, 如果external metric类型为2
+     * path-type设置为type 2 external, 此条路由的开销的link state component 开销为X
+     */
     new = ospf_ase_calculate_new_route (lsa, asbr_route, metric);
 
     /* (6) Compare the AS external path described by the LSA with the
@@ -409,6 +430,9 @@ ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
                external paths. When all paths are type 2 external
            paths, the paths with the smallest advertised type 2
            metric are always preferred. */
+        /* 域内和域间的路由总是比As       external path要好
+         * E1永远由于E2
+         */
         ret = ospf_route_cmp (ospf, new, or);
 
         /*     (c) If the new AS external path is still indistinguishable
@@ -428,13 +452,14 @@ ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
              compared by looking at the distance to the forwarding
              addresses.
         */
+        /* 如果 */
         /* New route is better */
-        if (ret < 0)
+        if (ret < 0) /* 新路由更好 */
         {
             if (IS_DEBUG_OSPF (lsa, LSA))
                 zlog_debug ("Route[External]: New route is better");
             ospf_route_subst (rn, new, asbr_route);
-            if (al->e[0].fwd_addr.s_addr)
+            if (al->e[0].fwd_addr.s_addr) /* 如果有转发地址,直接使用转发地址 */
                 ospf_ase_complete_direct_routes (new, al->e[0].fwd_addr);
             or = new;
             new = NULL;
@@ -465,6 +490,12 @@ ospf_ase_calculate_route (struct ospf *ospf, struct ospf_lsa * lsa)
     return 0;
 }
 
+/* 判断在rt中是否存在一条和newor一致的路由
+ * @param rt 路由表
+ * @param prefix 前缀,网段信息
+ * @param newor 待比较路由信息
+ * @return 存在返回1,否则返回0
+ */
 static int
 ospf_ase_route_match_same (struct route_table *rt, struct prefix *prefix,
                            struct ospf_route *newor)
@@ -485,7 +516,7 @@ ospf_ase_route_match_same (struct route_table *rt, struct prefix *prefix,
 
     route_unlock_node (rn);
 
-    or = rn->info;
+    or = rn->info; /* or为老的路由 */
     if (or->path_type != newor->path_type)
         return 0;
 
@@ -632,6 +663,10 @@ ospf_ase_calculate_timer_add (struct ospf *ospf)
                                              ospf, OSPF_ASE_CALC_INTERVAL);
 }
 
+/* 注册external lsa,其实就是将lsa加入ospf->external_lsas中
+ * @param lsa
+ * @param top ospf实例
+ */
 void
 ospf_ase_register_external_lsa (struct ospf_lsa *lsa, struct ospf *top)
 {
@@ -644,7 +679,7 @@ ospf_ase_register_external_lsa (struct ospf_lsa *lsa, struct ospf *top)
     p.family = AF_INET;
     p.prefix = lsa->data->id;
     p.prefixlen = ip_masklen (al->mask);
-    apply_mask_ipv4 (&p);
+    apply_mask_ipv4 (&p); /* 获取网段信息 */
 
     rn = route_node_get (top->external_lsas, (struct prefix *) &p);
     if ((lst = rn->info) == NULL)
@@ -715,7 +750,7 @@ ospf_ase_incremental_update (struct ospf *ospf, struct ospf_lsa *lsa)
     p.family = AF_INET;
     p.prefix = lsa->data->id;
     p.prefixlen = ip_masklen (al->mask);
-    apply_mask_ipv4 (&p);
+    apply_mask_ipv4 (&p); /* 获取网段信息 */
 
     /* if new_table is NULL, there was no spf calculation, thus
        incremental update is unneeded */
@@ -725,7 +760,7 @@ ospf_ase_incremental_update (struct ospf *ospf, struct ospf_lsa *lsa)
     /* If there is already an intra-area or inter-area route
        to the destination, no recalculation is necessary
        (internal routes take precedence). */
-
+    /* 如果路由表汇总已经有域内或者域间路由(到达目的的),不必计算 */
     rn = route_node_lookup (ospf->new_table, (struct prefix *) &p);
     if (rn)
     {
@@ -740,7 +775,7 @@ ospf_ase_incremental_update (struct ospf *ospf, struct ospf_lsa *lsa)
     lsas = rn->info;
     route_unlock_node (rn);
 
-    for (ALL_LIST_ELEMENTS_RO (lsas, node, lsa))
+    for (ALL_LIST_ELEMENTS_RO (lsas, node, lsa)) /* 遍历lsa */
         ospf_ase_calculate_route (ospf, lsa);
 
     /* prepare temporary old routing table for compare */

@@ -2848,7 +2848,7 @@ ospf_lsa_install (struct ospf *ospf, struct ospf_interface *oi,
         case OSPF_ASBR_SUMMARY_LSA:
             new = ospf_summary_asbr_lsa_install (ospf, lsa, rt_recalc);
             break;
-        case OSPF_AS_EXTERNAL_LSA:
+        case OSPF_AS_EXTERNAL_LSA: /* type-5 */
             new = ospf_external_lsa_install (ospf, lsa, rt_recalc);
             break;
         case OSPF_OPAQUE_LINK_LSA:

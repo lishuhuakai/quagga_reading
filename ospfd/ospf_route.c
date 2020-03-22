@@ -750,7 +750,9 @@ ospf_asbr_route_cmp (struct ospf *ospf, struct ospf_route *r1,
  ret == 0 -- r1 and r2 are the same.
  ret >  0 -- r2 is better. */
 
-/* 两条ospf路由的比较 */
+/* 两条ospf路由的比较
+ * 先比较路由的类型,再比较开销
+ */
 int
 ospf_route_cmp (struct ospf *ospf, struct ospf_route *r1,
                 struct ospf_route *r2)
@@ -791,7 +793,7 @@ ospf_route_cmp (struct ospf *ospf, struct ospf_route *r1,
     }
 
     /* Anyway, compare the costs. */
-    return (r1->cost - r2->cost);
+    return (r1->cost - r2->cost); /* 路由类型一致,就比较开销 */
 }
 
 /*
