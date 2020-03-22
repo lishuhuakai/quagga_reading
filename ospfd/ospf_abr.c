@@ -881,6 +881,7 @@ ospf_abr_plist_in_check (struct ospf_area *area, struct ospf_route *or,
     return 1;
 }
 
+/* 使用导出列表对控制lsa的导出 */
 static int
 ospf_abr_plist_out_check (struct ospf_area *area, struct ospf_route *or,
                           struct prefix_ipv4 *p)
@@ -1920,6 +1921,7 @@ ospf_abr_task_timer (struct thread *thread)
     return 0;
 }
 
+/* 运行abr的相关任务 */
 void
 ospf_schedule_abr_task (struct ospf *ospf)
 {

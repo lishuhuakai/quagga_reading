@@ -92,8 +92,8 @@ struct access_master
 };
 
 /* Static structure for IPv4 access_list's master. */
-static struct access_master access_master_ipv4 = 
-{ 
+static struct access_master access_master_ipv4 =
+{
   {NULL, NULL},
   {NULL, NULL},
   NULL,
@@ -102,8 +102,8 @@ static struct access_master access_master_ipv4 =
 
 #ifdef HAVE_IPV6
 /* Static structure for IPv6 access_list's master. */
-static struct access_master access_master_ipv6 = 
-{ 
+static struct access_master access_master_ipv6 =
+{
   {NULL, NULL},
   {NULL, NULL},
   NULL,
@@ -314,7 +314,7 @@ access_list_insert (afi_t afi, const char *name)
 
       /* Set access_list to string list. */
       alist = &master->str;
-  
+
       /* Set point to insertion point. */
       for (point = alist->head; point; point = point->next)
 	if (point->name && strcmp (point->name, name) >= 0)
@@ -493,7 +493,7 @@ access_list_filter_delete (struct access_list *access, struct filter *filter)
    */
   char *name = access->name;
   access->name = NULL;
-  
+
   master = access->master;
 
   if (filter->next)
@@ -507,15 +507,15 @@ access_list_filter_delete (struct access_list *access, struct filter *filter)
     access->head = filter->next;
 
   filter_free (filter);
-  
+
   /* If access_list becomes empty delete it from access_master. */
   if (access_list_empty (access))
     access_list_delete (access);
-  
+
   /* Run hook function. */
   if (master->delete_hook)
     (*master->delete_hook) (name);
-  
+
   XFREE (MTYPE_ACCESS_LIST_STR, name);
 }
 
@@ -611,6 +611,12 @@ vty_access_list_remark_unset (struct vty *vty, afi_t afi, const char *name)
   return CMD_SUCCESS;
 }
 
+/* 构建access-list
+ * @param name_str access-list的名称
+ * @param type_str permit或者deny
+ * @param addr_str 网络地址
+ * @param addr_mask_str 掩码
+ */
 static int
 filter_set_cisco (struct vty *vty, const char *name_str, const char *type_str,
 		  const char *addr_str, const char *addr_mask_str,
@@ -638,7 +644,7 @@ filter_set_cisco (struct vty *vty, const char *name_str, const char *type_str,
       return CMD_WARNING;
     }
 
-  ret = inet_aton (addr_str, &addr);
+  ret = inet_aton (addr_str, &addr); /* 网络地址 */
   if (ret <= 0)
     {
       vty_out (vty, "%%Inconsistent address and mask%s",
@@ -832,7 +838,9 @@ DEFUN (no_access_list_standard_any,
 			   "255.255.255.255", NULL, NULL, 0, 0);
 }
 
-/* Extended access-list */
+/* Extended access-list
+ * 扩展的访问链表
+ */
 DEFUN (access_list_extended,
        access_list_extended_cmd,
        "access-list (<100-199>|<2000-2699>) (deny|permit) ip A.B.C.D A.B.C.D A.B.C.D A.B.C.D",
@@ -1343,7 +1351,7 @@ DEFUN (no_access_list_all,
   struct access_list *access;
   struct access_master *master;
   char *name;
-    
+
   /* Looking up access_list. */
   access = access_list_lookup (AFI_IP, argv[0]);
   if (access == NULL)
@@ -1354,20 +1362,20 @@ DEFUN (no_access_list_all,
     }
 
   master = access->master;
-  /* transfer ownership of access->name to a local, to retain 
+  /* transfer ownership of access->name to a local, to retain
    * a while longer, past access_list being freed */
   name = access->name;
   access->name = NULL;
-  
+
   /* Delete all filter from access-list. */
   access_list_delete (access);
 
   /* Run hook function. */
   if (master->delete_hook)
     (*master->delete_hook) (name);
- 
+
   XFREE (MTYPE_ACCESS_LIST_STR, name);
-  
+
   return CMD_SUCCESS;
 }
 
@@ -1411,7 +1419,7 @@ DEFUN (no_access_list_remark,
 {
   return vty_access_list_remark_unset (vty, AFI_IP, argv[0]);
 }
-	
+
 ALIAS (no_access_list_remark,
        no_access_list_remark_arg_cmd,
        "no access-list (<1-99>|<100-199>|<1300-1999>|<2000-2699>|WORD) remark .LINE",
@@ -1521,7 +1529,7 @@ DEFUN (no_ipv6_access_list_all,
   struct access_list *access;
   struct access_master *master;
   char *name;
-  
+
   /* Looking up access_list. */
   access = access_list_lookup (AFI_IP6, argv[0]);
   if (access == NULL)
@@ -1534,7 +1542,7 @@ DEFUN (no_ipv6_access_list_all,
   master = access->master;
   name = access->name;
   access->name = NULL;
-  
+
   /* Delete all filter from access-list. */
   access_list_delete (access);
 
@@ -1580,7 +1588,7 @@ DEFUN (no_ipv6_access_list_remark,
 {
   return vty_access_list_remark_unset (vty, AFI_IP6, argv[0]);
 }
-	
+
 ALIAS (no_ipv6_access_list_remark,
        no_ipv6_access_list_remark_arg_cmd,
        "no ipv6 access-list WORD remark .LINE",
@@ -1628,7 +1636,7 @@ filter_show (struct vty *vty, const char *name, afi_t afi)
 	  if (write)
 	    {
 	      vty_out (vty, "%s IP%s access list %s%s",
-		       mfilter->cisco ? 
+		       mfilter->cisco ?
 		       (filter->extended ? "Extended" : "Standard") : "Zebra",
 		       afi == AFI_IP6 ? "v6" : "",
 		       access->name, VTY_NEWLINE);
@@ -1671,7 +1679,7 @@ filter_show (struct vty *vty, const char *name, afi_t afi)
 	  if (write)
 	    {
 	      vty_out (vty, "%s IP%s access list %s%s",
-		       mfilter->cisco ? 
+		       mfilter->cisco ?
 		       (filter->extended ? "Extended" : "Standard") : "Zebra",
 		       afi == AFI_IP6 ? "v6" : "",
 		       access->name, VTY_NEWLINE);

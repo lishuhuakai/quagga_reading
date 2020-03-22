@@ -1842,6 +1842,7 @@ DEFUN (ospf_area_export_list,
        "Set the filter for networks announced to other areas\n"
        "Name of the access-list\n")
 {
+    /* 控制区域导出的路由 */
     struct ospf *ospf = vty->index;
     struct ospf_area *area;
     struct in_addr area_id;

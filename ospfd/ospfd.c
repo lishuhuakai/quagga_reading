@@ -1401,7 +1401,7 @@ ospf_area_export_list_set (struct ospf *ospf,
                            struct ospf_area *area, const char *list_name)
 {
     struct access_list *list;
-    list = access_list_lookup (AFI_IP, list_name);
+    list = access_list_lookup (AFI_IP, list_name); /* œ»’“µΩlist */
 
     EXPORT_LIST (area) = list;
 
