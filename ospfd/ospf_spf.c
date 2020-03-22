@@ -196,7 +196,7 @@ vertex_parent_new (struct vertex *v, int backlink, struct vertex_nexthop *hop)
     if (new == NULL)
         return NULL;
 
-    new->parent = v;
+    new->parent = v; /* 父顶点 */
     new->backlink = backlink; /* 第几条lsa指向v */
     new->nexthop = hop;
     return new;
@@ -354,7 +354,7 @@ ospf_spf_init (struct ospf_area *area)
 }
 
 /* return index of link back to V from W, or -1 if no link found
- * 判断w中是否有一个链接指向v,如果存在,返回lsa的index
+ * 判断w中是否有一个链接指向v,如果存在,返回链接lsa的index
  */
 static int
 ospf_lsa_has_link (struct lsa_header *w, struct lsa_header *v)
@@ -433,7 +433,7 @@ ospf_get_next_link (struct vertex *v, struct vertex *w,
     u_char lsa_type =  LSA_LINK_TYPE_TRANSIT;
     struct router_lsa_link *l;
 
-    if (w->type == OSPF_VERTEX_ROUTER)
+    if (w->type == OSPF_VERTEX_ROUTER) /* w为路由器 */
         lsa_type = LSA_LINK_TYPE_POINTOPOINT;
 
     if (prev_link == NULL)
@@ -441,6 +441,7 @@ ospf_get_next_link (struct vertex *v, struct vertex *w,
     else
     {
         p = (u_char *) prev_link;
+        /* p指向prev_link的下一个lsa */
         p += (OSPF_ROUTER_LSA_LINK_SIZE +
               (prev_link->m[0].tos_count * OSPF_ROUTER_LSA_TOS_SIZE)); /* p指向下一个lsa */
     }
@@ -568,8 +569,11 @@ ospf_spf_add_parent (struct vertex *v, struct vertex *w,
  * provided distance as appropriate.
  * 添加成功返回1,否则返回0
  * 此函数主要用于计算下一跳的信息
- * @area 区域信息
- * @v/w 顶点
+ * @param area 区域信息
+ * @param v/w 顶点
+ * 需要注意,l以及lsa_pos参数只有router-lsa才有
+ * @param l router-lsa中关于v->w的信息
+ * @param lsa_pos l在router-lsa的lsa中的位置
  */
 static unsigned int
 ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
@@ -625,8 +629,8 @@ ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
                        inet_ntop (AF_INET, &l->link_data, buf2, BUFSIZ));
         }
 
-        if (w->type == OSPF_VERTEX_ROUTER) /* v和w在同一个区域内 */
-        { /* w是一个路由器 */
+        if (w->type == OSPF_VERTEX_ROUTER) /* w是一台路由器 */
+        {
             /* l  is a link from v to w
              * l是从v到w的一条链路
              * l2 will be link from w to v
@@ -711,7 +715,7 @@ ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
                     /* 记录下出接口,以及下一条的ip地址 */
                     nh->oi = oi;
                     nh->router = nexthop;
-                    /* nh代表从w -> v的路由信息 */
+                    /* nh代表从v -> w的路由信息 */
                     ospf_spf_add_parent (v, w, nh, distance);
                     return 1;
                 }
@@ -747,7 +751,7 @@ ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
             } /* end virtual-link from V to W */
             return 0;
         } /* end W is a Router vertex */
-        else /* W被一个network-lsa通告 */
+        else /* W被一个network-lsa通告,w是一个网络 */
         {
             assert(w->type == OSPF_VERTEX_NETWORK);
 
@@ -842,6 +846,7 @@ ospf_nexthop_calculation (struct ospf_area *area, struct vertex *v,
     if (IS_DEBUG_OSPF_EVENT)
         zlog_debug ("%s: Intervening routers, adding parent(s)", __func__);
 
+    /* 这里我需要说明一下,既然通过root可以到达v,v可以到达w,下一跳跳到v,也可以到达w */
     for (ALL_LIST_ELEMENTS (v->parents, node, nnode, vp))
     {
         added = 1;
@@ -1007,7 +1012,7 @@ ospf_spf_next (struct vertex *v, struct ospf_area *area,
         }
         /* v已经存在一条链路指向w,现在
          * 需要保证v的邻居w也有一条链路指向v */
-        if (ospf_lsa_has_link (w_lsa->data, v->lsa) < 0 )
+        if (ospf_lsa_has_link (w_lsa->data, v->lsa) < 0)
         {
             if (IS_DEBUG_OSPF_EVENT)
                 zlog_debug ("The LSA doesn't have a link back");
@@ -1144,6 +1149,7 @@ ospf_spf_dump (struct vertex *v, int i)
 /* Second stage of SPF calculation.
  * 处理末梢区域
  * 所谓末梢区域,指的是只有一台路由器连接外部网络的这个一个网络
+ * @param parent_is_root父节点是否为root节点
  */
 static void
 ospf_spf_process_stubs (struct ospf_area *area, struct vertex *v,
@@ -1207,7 +1213,7 @@ ospf_spf_process_stubs (struct ospf_area *area, struct vertex *v,
         /* 递归添加路由信息 */
         ospf_spf_process_stubs (area, child, rt, parent_is_root);
 
-        SET_FLAG (child->flags, OSPF_VERTEX_PROCESSED);
+        SET_FLAG (child->flags, OSPF_VERTEX_PROCESSED); /* 处理过的顶点不再处理 */
     }
 }
 
@@ -1242,6 +1248,7 @@ ospf_rtrs_free (struct route_table *rtrs)
 /* Calculating the shortest-path tree for an area.
  * 计算一个区域的最短路径树
  * 生成的路由信息要放入new_table以及new_rtrs
+ * @param area 区域
  */
 static void
 ospf_spf_calculate (struct ospf_area *area, struct route_table *new_table,

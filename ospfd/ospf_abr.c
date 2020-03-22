@@ -168,6 +168,7 @@ ospf_area_range_match (struct ospf_area *area, struct prefix_ipv4 *p)
     return NULL;
 }
 
+/* ÓÃÓÚÆ¥Åä¹ıÂËÆ÷ */
 struct ospf_area_range *
 ospf_area_range_match_any (struct ospf *ospf, struct prefix_ipv4 *p)
 {

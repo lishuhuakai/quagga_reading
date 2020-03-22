@@ -40,6 +40,7 @@ struct vertex
     u_char flags;
     /*  */
     u_char type;      /* copied from LSA header */
+    /* 关于id,对于router-lsa,为始发路由器的router id,对于network-lsa,为DR接口上的ip地址 */
     struct in_addr id;    /* copied from LSA header */
     struct lsa_header *lsa; /* Router or Network LSA */
     int *stat;        /* Link to LSA status. */

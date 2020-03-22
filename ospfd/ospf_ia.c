@@ -1,5 +1,6 @@
 /*
  * OSPF inter-area routing.
+ * OSPF域间路由
  * Copyright (C) 1999, 2000 Alex Zinin, Toshiaki Takada
  *
  * This file is part of GNU Zebra.
@@ -46,6 +47,9 @@
 #include "ospfd/ospf_ia.h"
 #include "ospfd/ospf_dump.h"
 
+/*
+ * 查找ospf路由
+ */
 static struct ospf_route *
 ospf_find_abr_route (struct route_table *rtrs,
                      struct prefix_ipv4 *abr,
@@ -68,6 +72,13 @@ ospf_find_abr_route (struct route_table *rtrs,
     return NULL;
 }
 
+/*
+ * @param ospf ospf实例
+ * @param rt 路由表
+ * @param p 前缀
+ * @param new_or 新构建的ospf路由
+ * @param abr_or 老的ospf路由
+ */
 static void
 ospf_ia_network_route (struct ospf *ospf, struct route_table *rt,
                        struct prefix_ipv4 *p, struct ospf_route *new_or,
@@ -197,6 +208,8 @@ ospf_ia_router_route (struct ospf *ospf, struct route_table *rtrs,
 
 /*
  * 处理 summary-lsa
+ * @param area 对应的区域
+ * @param lsa
  */
 static int
 process_summary_lsa (struct ospf_area *area, struct route_table *rt,
@@ -265,21 +278,21 @@ process_summary_lsa (struct ospf_area *area, struct route_table *rt,
         return 0;
 
     new_or = ospf_route_new ();
-    new_or->type = OSPF_DESTINATION_NETWORK;
-    new_or->id = sl->header.id;
+    new_or->type = OSPF_DESTINATION_NETWORK; /* 到达某个网络的路由 */
+    new_or->id = sl->header.id; /* 对于type-3,链路状态id是网络或者子网的ip地址 */
     new_or->mask = sl->mask;
     new_or->u.std.options = sl->header.options;
     new_or->u.std.origin = (struct lsa_header *) sl;
     new_or->cost = abr_or->cost + metric;
     new_or->u.std.area_id = area->area_id;
     new_or->u.std.external_routing = area->external_routing;
-    new_or->path_type = OSPF_PATH_INTER_AREA;
+    new_or->path_type = OSPF_PATH_INTER_AREA; /* 域间路由 */
 
     if (sl->header.type == OSPF_SUMMARY_LSA)
         ospf_ia_network_route (ospf, rt, &p, new_or, abr_or);
     else
     {
-        new_or->type = OSPF_DESTINATION_ROUTER;
+        new_or->type = OSPF_DESTINATION_ROUTER; /* 到路由器的路由 */
         new_or->u.std.flags = ROUTER_LSA_EXTERNAL;
         ospf_ia_router_route (ospf, rtrs, &p, new_or, abr_or);
     }
@@ -607,6 +620,7 @@ ospf_examine_transit_summaries (struct ospf_area *area,
     process_transit_summary_lsa (area, rt, rtrs, lsa);
 }
 
+/* 处理域间路由路由 */
 void
 ospf_ia_routing (struct ospf *ospf,
                  struct route_table *rt,
@@ -637,7 +651,7 @@ ospf_ia_routing (struct ospf *ospf,
                         zlog_debug ("ospf_ia_routing():backbone area found");
                         zlog_debug ("ospf_ia_routing():examining summaries");
                     }
-
+                    /* 处理type-3和type-4的lsa,生成路由信息 */
                     OSPF_EXAMINE_SUMMARIES_ALL (area, rt, rtrs);
 
                     for (ALL_LIST_ELEMENTS_RO (ospf->areas, node, area))

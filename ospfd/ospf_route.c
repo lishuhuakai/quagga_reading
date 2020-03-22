@@ -1,5 +1,6 @@
 /*
  * OSPF routing table.
+ * OSPF路由表
  * Copyright (C) 1999, 2000 Toshiaki Takada
  *
  * This file is part of GNU Zebra.
@@ -74,6 +75,7 @@ ospf_path_new ()
     return new;
 }
 
+/* path的拷贝 */
 static struct ospf_path *
 ospf_path_dup (struct ospf_path *path)
 {
@@ -130,6 +132,7 @@ ospf_route_table_free (struct route_table *rt)
    otherwise return 0. Since the ZEBRA-RIB does an implicit
    withdraw, it is not necessary to send a delete, an add later
    will act like an implicit delete. */
+/* 如果前缀存在于新的路由表中,返回1,否则返回0 */
 static int
 ospf_route_exist_new_table (struct route_table *rt, struct prefix_ipv4 *prefix)
 {
@@ -155,6 +158,7 @@ ospf_route_exist_new_table (struct route_table *rt, struct prefix_ipv4 *prefix)
 
 /* If a prefix and a nexthop match any route in the routing table,
    then return 1, otherwise return 0. */
+/* 如果前缀和下一跳匹配路由表中的一条路由,返回1,否则返回0 */
 int
 ospf_route_match_same (struct route_table *rt, struct prefix_ipv4 *prefix,
                        struct ospf_route *newor)
@@ -169,7 +173,7 @@ ospf_route_match_same (struct route_table *rt, struct prefix_ipv4 *prefix,
     if (! rt || ! prefix)
         return 0;
 
-    rn = route_node_lookup (rt, (struct prefix *) prefix);
+    rn = route_node_lookup (rt, (struct prefix *) prefix); /* 查找路由表项 */
     if (! rn || ! rn->info)
         return 0;
 
@@ -183,16 +187,16 @@ ospf_route_match_same (struct route_table *rt, struct prefix_ipv4 *prefix,
             if (or->paths->count != newor->paths->count)
                 return 0;
 
-            /* Check each path. */
+            /* Check each path.检查每一条路径 */
             for (n1 = listhead (or->paths), n2 = listhead (newor->paths);
                  n1 && n2; n1 = listnextnode (n1), n2 = listnextnode (n2))
             {
                 op = listgetdata (n1);
                 newop = listgetdata (n2);
 
-                if (! IPV4_ADDR_SAME (&op->nexthop, &newop->nexthop))
+                if (! IPV4_ADDR_SAME (&op->nexthop, &newop->nexthop)) /* 每一跳的ip都要匹配 */
                     return 0;
-                if (op->ifindex != newop->ifindex)
+                if (op->ifindex != newop->ifindex) /* 接口都要陪陪 */
                     return 0;
             }
             return 1;
@@ -205,6 +209,7 @@ ospf_route_match_same (struct route_table *rt, struct prefix_ipv4 *prefix,
 
 /* delete routes generated from AS-External routes if there is a inter/intra
  * area route
+ * 删除AS-External 路由
  */
 static void
 ospf_route_delete_same_ext(struct route_table *external_routes,
@@ -217,16 +222,17 @@ ospf_route_delete_same_ext(struct route_table *external_routes,
         return;
 
     /* Remove deleted routes */
-    for ( rn = route_top (routes); rn; rn = route_next (rn) )
+    for (rn = route_top (routes); rn; rn = route_next (rn)) /* 遍历路由表中的每一个路由表项 */
     {
         if (rn && rn->info)
         {
             struct prefix_ipv4 *p = (struct prefix_ipv4 *)(&rn->p);
-            if ( (ext_rn = route_node_lookup (external_routes, (struct prefix *)p)) )
+            /* 如果在external_routes中找到了 */
+            if ((ext_rn = route_node_lookup (external_routes, (struct prefix *)p)) )
             {
                 if (ext_rn->info)
                 {
-                    ospf_zebra_delete (p, ext_rn->info);
+                    ospf_zebra_delete (p, ext_rn->info); /* 从zebra中移除即可 */
                     ospf_route_free( ext_rn->info);
                     ext_rn->info = NULL;
                 }
@@ -237,6 +243,10 @@ ospf_route_delete_same_ext(struct route_table *external_routes,
 }
 
 /* rt: Old, cmprt: New */
+/*
+ * @param rt 旧的路由表
+ * @param cmprt 新的路由表
+ */
 static void
 ospf_route_delete_uniq (struct route_table *rt, struct route_table *cmprt)
 {
@@ -248,8 +258,9 @@ ospf_route_delete_uniq (struct route_table *rt, struct route_table *cmprt)
             if (or->path_type == OSPF_PATH_INTRA_AREA ||
                 or->path_type == OSPF_PATH_INTER_AREA)
             {
-                if (or->type == OSPF_DESTINATION_NETWORK)
+                if (or->type == OSPF_DESTINATION_NETWORK) /* 到达一个网段 */
                 {
+                    /* 如果新的路由表中不存在,将这个路由从zebra中移除 */
                     if (! ospf_route_exist_new_table (cmprt,
                                                       (struct prefix_ipv4 *) &rn->p))
                         ospf_zebra_delete ((struct prefix_ipv4 *) &rn->p, or);
@@ -261,7 +272,9 @@ ospf_route_delete_uniq (struct route_table *rt, struct route_table *cmprt)
             }
 }
 
-/* Install routes to table. */
+/* Install routes to table.
+ * 将已经生成好的路由信息 通过zebra安装到内核中去
+ */
 void
 ospf_route_install (struct ospf *ospf, struct route_table *rt)
 {
@@ -277,6 +290,7 @@ ospf_route_install (struct ospf *ospf, struct route_table *rt)
     ospf->new_table = rt;
 
     /* Delete old routes. */
+    /* 首先删除老的路由 */
     if (ospf->old_table)
         ospf_route_delete_uniq (ospf->old_table, rt);
     if (ospf->old_external_route)
@@ -301,7 +315,9 @@ ospf_route_install (struct ospf *ospf, struct route_table *rt)
 
 /* RFC2328 16.1. (4). For "router".
  * 添加路由信息
- * 添加到达顶点v的路由信息
+ * 添加到达顶点v的路由信息 (域内),顶点v是一个路由器
+ * @param rt 路由表
+ * @param v 顶点
  */
 void
 ospf_intra_add_router (struct route_table *rt, struct vertex *v,
@@ -332,7 +348,7 @@ ospf_intra_add_router (struct route_table *rt, struct vertex *v,
        "router".
      * 如果新增加的顶点是一个区域边界路由器(ABR)或者自治系统边界路由器(ASBR)，才会添加路由
      */
-    if (! IS_ROUTER_LSA_BORDER (lsa) && ! IS_ROUTER_LSA_EXTERNAL (lsa))
+    if (!IS_ROUTER_LSA_BORDER (lsa) && !IS_ROUTER_LSA_EXTERNAL (lsa))
     {
         if (IS_DEBUG_OSPF_EVENT)
             zlog_debug ("ospf_intra_add_router: "
@@ -354,12 +370,12 @@ ospf_intra_add_router (struct route_table *rt, struct vertex *v,
     or->id = v->id;
     or->u.std.area_id = area->area_id; /* 区域id */
     or->u.std.external_routing = area->external_routing;
-    or->path_type = OSPF_PATH_INTRA_AREA; /* 区域内路由 */
+    or->path_type = OSPF_PATH_INTRA_AREA; /* 域内路由 */
     or->cost = v->distance; /* 距离或者开销 */
-    or->type = OSPF_DESTINATION_ROUTER;
+    or->type = OSPF_DESTINATION_ROUTER; /* 到路由器的路由 */
     or->u.std.origin = (struct lsa_header *) lsa;
     or->u.std.options = lsa->header.options;
-    or->u.std.flags = lsa->flags;
+    or->u.std.flags = lsa->flags; /* 路由器的标志信息,是否为ABR,ASBR等 */
 
     /* If Router X is the endpoint of one of the calculating router's
        virtual links, and the virtual link uses Area A as Transit area:
@@ -371,7 +387,6 @@ ospf_intra_add_router (struct route_table *rt, struct vertex *v,
        shortest- path tree; equivalently, this is the interface that
        points back to Router X's parent vertex on the shortest-path tree
        (similar to the calculation in Section 16.1.1). */
-
     p.family = AF_INET;
     p.prefix = v->id; /* DR路由器接口上的地址 */
     p.prefixlen = IPV4_MAX_BITLEN;
@@ -383,6 +398,7 @@ ospf_intra_add_router (struct route_table *rt, struct vertex *v,
     rn = route_node_get (rt, (struct prefix *) &p);
 
     /* Note that we keep all routes to ABRs and ASBRs, not only the best */
+    /* 我们需要保存所有的到abr以及asbr的路由,而不仅仅是最好的 */
     if (rn->info == NULL)
         rn->info = list_new ();
     else
@@ -398,7 +414,9 @@ ospf_intra_add_router (struct route_table *rt, struct vertex *v,
 
 /* RFC2328 16.1. (4).  For transit network.
  * 处理传输网络
- * v代表一个网络
+ * v代表一个网络 (域内)
+ * @param rt 路由表
+ * @param area 区域
  */
 void
 ospf_intra_add_transit (struct route_table *rt, struct vertex *v,
@@ -422,7 +440,7 @@ ospf_intra_add_transit (struct route_table *rt, struct vertex *v,
     p.family = AF_INET;
     p.prefix = v->id; /* 一般是DR的ip地址 */
     p.prefixlen = ip_masklen (lsa->mask);
-    apply_mask_ipv4 (&p);
+    apply_mask_ipv4 (&p); /* 可以获得网络信息 */
 
     /* 获取到达此网络(p)的路由信息 */
     rn = route_node_get (rt, (struct prefix *) &p);
@@ -437,7 +455,8 @@ ospf_intra_add_transit (struct route_table *rt, struct vertex *v,
        has a smaller Link State ID than the newly added vertex' LSA.
     * 如果路由表项已经存在(已经有一个intra-area路由可以到达目的地,)
     * 多个顶点已经映射到了同一个网络.举个例子,一个新的DR建立的时候会出现这种
-    * 情况
+    * 情况.这种情况下,当前的路由表现会被覆盖,当且仅当新发现的路径更短,以及当前路由表中的链路状态id
+    * 比lsa的链路状态id更小(说明此lsa更新)
     */
     if (rn->info)
     {
@@ -458,18 +477,19 @@ ospf_intra_add_transit (struct route_table *rt, struct vertex *v,
     or->id = v->id;
     or->u.std.area_id = area->area_id; /* 区域id */
     or->u.std.external_routing = area->external_routing;
-    or->path_type = OSPF_PATH_INTRA_AREA; /* 区域内路由 */
+    or->path_type = OSPF_PATH_INTRA_AREA; /* 域内路由 */
     or->cost = v->distance;
-    or->type = OSPF_DESTINATION_NETWORK;
+    or->type = OSPF_DESTINATION_NETWORK; /* 到达某个网络 */
     or->u.std.origin = (struct lsa_header *) lsa;
 
     ospf_route_copy_nexthops_from_vertex (or, v);
 
-    rn->info = or;
+    rn->info = or; /* 更新路由表项 */
 }
 
 /* RFC2328 16.1. second stage.
- * 添加域间路由,到末梢网络的路由
+ * 添加路由,到末梢网络的路由 (域内)
+ * @param link router-lsa中用于描述到达此末梢网络的lsa信息
  */
 void
 ospf_intra_add_stub (struct route_table *rt, struct router_lsa_link *link,
@@ -491,8 +511,8 @@ ospf_intra_add_stub (struct route_table *rt, struct router_lsa_link *link,
     lsa = (struct router_lsa *) v->lsa;
 
     p.family = AF_INET;
-    p.prefix = link->link_id;
-    p.prefixlen = ip_masklen (link->link_data);
+    p.prefix = link->link_id; /* 网络号 */
+    p.prefixlen = ip_masklen (link->link_data); /* 掩码 */
     apply_mask_ipv4 (&p);
 
     if (IS_DEBUG_OSPF_EVENT)
@@ -503,7 +523,7 @@ ospf_intra_add_stub (struct route_table *rt, struct router_lsa_link *link,
        equal to the distance from the root to the router vertex
        (calculated in stage 1), plus the stub network link's advertised
        cost. */
-    cost = v->distance + ntohs (link->m[0].metric);
+    cost = v->distance + ntohs (link->m[0].metric); /* 开销 */
 
     if (IS_DEBUG_OSPF_EVENT)
         zlog_debug ("ospf_intra_add_stub(): calculated cost is %d + %d = %d",
@@ -608,7 +628,7 @@ ospf_intra_add_stub (struct route_table *rt, struct router_lsa_link *link,
     or->u.std.external_routing = area->external_routing;
     or->path_type = OSPF_PATH_INTRA_AREA;
     or->cost = cost;
-    or->type = OSPF_DESTINATION_NETWORK;
+    or->type = OSPF_DESTINATION_NETWORK; /* 到达一个网络 */
     or->u.std.origin = (struct lsa_header *) lsa;
 
     /* Nexthop is depend on connection type. */
@@ -658,6 +678,7 @@ const char *ospf_path_type_str[] =
 
 /*
  * 打印路由信息
+ * @param rt 路由表
  */
 void
 ospf_route_table_dump (struct route_table *rt)
@@ -678,13 +699,13 @@ ospf_route_table_dump (struct route_table *rt)
     for (rn = route_top (rt); rn; rn = route_next (rn))
         if ((or = rn->info) != NULL)
         {
-            if (or->type == OSPF_DESTINATION_NETWORK)
+            if (or->type == OSPF_DESTINATION_NETWORK) /* 达到一个网络 */
             {
                 zlog_debug ("N %s/%d\t%s\t%s\t%d",
                             inet_ntop (AF_INET, &rn->p.u.prefix4, buf1, BUFSIZ), /* 网段 */
                             rn->p.prefixlen, /* 掩码 */
                             inet_ntop (AF_INET, &or->u.std.area_id, buf2,
-                                       BUFSIZ), /* area id */
+                                       BUFSIZ), /* area id,属于哪一个区域 */
                             ospf_path_type_str[or->path_type], /* 路径类型 */
                             or->cost); /* 开销 */
                 for (ALL_LIST_ELEMENTS_RO (or->paths, pnode, path))
@@ -705,6 +726,7 @@ ospf_route_table_dump (struct route_table *rt)
    o Intra-area paths using non-backbone areas are always the most preferred.
    o The other paths, intra-area backbone paths and inter-area paths,
      are of equal preference. */
+/* 域内路由使用非骨干区域,总是更加受到偏爱的 */
 static int
 ospf_asbr_route_cmp (struct ospf *ospf, struct ospf_route *r1,
                      struct ospf_route *r2)
@@ -727,6 +749,8 @@ ospf_asbr_route_cmp (struct ospf *ospf, struct ospf_route *r1,
  ret <  0 -- r1 is better.
  ret == 0 -- r1 and r2 are the same.
  ret >  0 -- r2 is better. */
+
+/* 两条ospf路由的比较 */
 int
 ospf_route_cmp (struct ospf *ospf, struct ospf_route *r1,
                 struct ospf_route *r2)
@@ -803,11 +827,11 @@ ospf_route_copy_nexthops_from_vertex (struct ospf_route *to,
 
     assert (to->paths);
     /* 这里遍历父节点 */
-    for (ALL_LIST_ELEMENTS_RO (v->parents, node, vp))
+    for (ALL_LIST_ELEMENTS_RO (v->parents, node, vp)) /* 遍历父节点 */
     {
         nexthop = vp->nexthop;
 
-        if (nexthop->oi != NULL)
+        if (nexthop->oi != NULL) /* 可以通过某个接口到达父节点 */
         {
             /* 判断是否存在一条到达router的路径信息 */
             if (!ospf_path_exist (to->paths, nexthop->router, nexthop->oi))
@@ -896,6 +920,7 @@ ospf_route_add (struct route_table *rt, struct prefix_ipv4 *p,
     rn->info = new_or;
 }
 
+/* 在路由表中裁剪那些无法到达的网络 */
 void
 ospf_prune_unreachable_networks (struct route_table *rt)
 {
@@ -911,7 +936,7 @@ ospf_prune_unreachable_networks (struct route_table *rt)
         if (rn->info != NULL)
         {
             or = rn->info;
-            if (listcount (or->paths) == 0)
+            if (listcount (or->paths) == 0) /* 也就是没有路径到达这个网段,直接丢弃 */
             {
                 if (IS_DEBUG_OSPF_EVENT)
                     zlog_debug ("Pruning route to %s/%d",

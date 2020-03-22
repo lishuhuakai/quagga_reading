@@ -167,7 +167,7 @@ struct router_lsa_link
 struct router_lsa
 {
     struct lsa_header header;
-    u_char flags;
+    u_char flags; /* B 始发路由器是一个ASBR路由器,B始发路由器是一个ABR */
     u_char zero;
     u_int16_t links;
     struct

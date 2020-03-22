@@ -423,7 +423,7 @@ ospf_if_lookup_by_lsa_pos (struct ospf_area *area, int lsa_pos)
     struct listnode *node;
     struct ospf_interface *oi;
 
-    for (ALL_LIST_ELEMENTS_RO (area->oiflist, node, oi))
+    for (ALL_LIST_ELEMENTS_RO (area->oiflist, node, oi)) /* 遍历区域的ospf接口 */
     {
         if (lsa_pos >= oi->lsa_pos_beg && lsa_pos < oi->lsa_pos_end)
             return oi;

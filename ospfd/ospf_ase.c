@@ -1,5 +1,6 @@
 /*
  * OSPF AS external route calculation.
+ * ospf 自治系统external router计算
  * Copyright (C) 1999, 2000 Alex Zinin, Toshiaki Takada
  *
  * This file is part of GNU Zebra.
@@ -46,6 +47,9 @@
 #include "ospfd/ospf_zebra.h"
 #include "ospfd/ospf_dump.h"
 
+/*
+ * 查找对应的asbr路由
+ */
 struct ospf_route *
 ospf_find_asbr_route (struct ospf *ospf,
                       struct route_table *rtrs, struct prefix_ipv4 *asbr)

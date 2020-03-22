@@ -139,6 +139,10 @@ struct ospf_interface
     struct ospf_area *area;
 
     /* Position range in Router LSA */
+    /* 关于下面两个变量,需要说明一下,在路由器产生自己的route-lsa的时候(router_lsa_link_set),
+     * 由于描述lsa是按照接口来描述的,因此,lsa_pos_beg以及lsa_pos_end记录了在自己产生的router-lsa中
+     * 有关于此接口链路信息的lsa的起始位置
+     */
     uint16_t lsa_pos_beg; /* inclusive, >= */
     uint16_t lsa_pos_end; /* exclusive, <  */
 

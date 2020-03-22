@@ -36,11 +36,13 @@
 #define OSPF_PATH_TYPE2_EXTERNAL    4
 #define OSPF_PATH_MAX           5
 
-/* OSPF Path. */
+/* OSPF Path.
+ * OSPF 路径
+ */
 struct ospf_path
 {
-    struct in_addr nexthop;
-    struct in_addr adv_router;
+    struct in_addr nexthop; /* 下一跳 */
+    struct in_addr adv_router; /* 通告路由器 */
     ifindex_t ifindex;
 };
 
@@ -55,7 +57,11 @@ struct ospf_path
    but
    nr->info is a (struct ospf_router_route *) for OSPF_DESTINATION_ROUTER
 */
-
+/* 下面的结构体链接着每一个路由节点,值得注意的是,网络路由保留单个ospf_route
+ * 的条目,而对于ABR和ASBR,我们链接ospf_router_route的实例,维护路径列表的位置
+ * 因此,如果nr->info 是一个ospf_route的指针,对于OSPF_DESTINATION_NETWORK
+ * 对于OSPF_DESTINATION_ROUTER,nr->info是一个ospf_router_router的指针
+ */
 struct route_standard
 {
     /* Link Sate Origin. */
@@ -69,6 +75,7 @@ struct route_standard
     int external_routing; /* 区域类型 */
 
     /* Optional Capability. */
+    /* lsa头部中的可选字段 */
     u_char options;       /* Get from LSA header. */
 
     /*  */
@@ -98,21 +105,26 @@ struct ospf_route
     /* Create time. */
     time_t ctime;
 
-    /* Modified time. */
+    /* Modified time. 修改时间 */
     time_t mtime;
 
     /* Destination Type. 目的类型 */
+    /* 一般存在两种类型,一种是OSPF_DESTINATION_NETWORK,另外一种是OSPF_DESTINATION_ROUTER
+     * 该条路由的目的地的类型,包括路由,网段和丢弃
+     */
     u_char type;
 
     /* Destination ID. */     /* i.e. Link State ID. */
-    /* 目的id,比如说链路状态id */
+    /* 目的id,比如说链路状态id
+     * type为网段,则为网络号,type为路由器,则为路由器id
+     */
     struct in_addr id;
 
     /* Address Mask. */
     struct in_addr mask;      /* Only valid for networks. */
 
     /* Path Type. */
-    u_char path_type;
+    u_char path_type; /* 域内路由,域间路由,第一类外部路由,第二类外部路由 */
 
     /* List of Paths. */
     struct list *paths;
@@ -120,7 +132,9 @@ struct ospf_route
     /* Link State Cost. */
     u_int32_t cost;       /* i.e. metric. */
 
-    /* Route specific info. */
+    /* Route specific info.
+     * 描述特定路由相关的信息
+     */
     union
     {
         struct route_standard std;
