@@ -191,6 +191,7 @@ struct if_link_params
 #define HAS_LINK_PARAMS(ifp)  ((ifp)->link_params != NULL)
 
 /* Interface structure */
+/* interface结构用于描述路由器上真正的接口 */
 struct interface
 {
     /* Interface name.  This should probably never be changed after the
@@ -225,7 +226,7 @@ struct interface
 
     /* Link-layer information and hardware address */
     enum zebra_link_type ll_type;
-    u_char hw_addr[INTERFACE_HWADDR_MAX];
+    u_char hw_addr[INTERFACE_HWADDR_MAX]; /* mac地址 */
     int hw_addr_len;
 
     /* interface bandwidth, kbits */
@@ -242,10 +243,10 @@ struct interface
     void *distribute_out;
 
     /* Connected address list. */
-    struct list *connected;
+    struct list *connected; /* 记录接口拥有的ip地址,一个接口可能会有多个ip地址 */
 
     /* Daemon specific interface data pointer. */
-    void *info;
+    void *info; /* 这里记录了相关的参数信息 */
 
     /* Statistics fileds. */
 #ifdef HAVE_PROC_NET_DEV
@@ -255,11 +256,14 @@ struct interface
     struct if_data stats;
 #endif /* HAVE_NET_RT_IFLIST */
 
-    vrf_id_t vrf_id;
+    vrf_id_t vrf_id; /* 所属的路由转发表的id */
 };
 
 /* Connected address structure. */
-/* 需要连接的地址信息 */
+/* 需要连接的地址信息
+ * 这个结构其实是多用途的,在interface结构里面,它表示接口拥有的ip地址
+ * 在虚链路中,它又是另外一个用途
+ */
 struct connected
 {
     /* Attached interface. */
@@ -297,6 +301,8 @@ struct connected
        the destination field must contain the peer address.
        Otherwise, if this flag is not set, the destination address
        will either contain a broadcast address or be NULL.
+       ZEBRA_IFA_PEER标记被设定,当且仅当对端的地址被设定了.也就是destination字段必须被设定
+       否则的话,destination为空或者是一个广播地址
      */
 
     /* Address of connected network. */

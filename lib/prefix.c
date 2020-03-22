@@ -585,6 +585,7 @@ masklen2ip (const int masklen, struct in_addr *netmask)
 
 /* Convert IP address's netmask into integer. We assume netmask is
    sequential one. Argument netmask should be network byte order. */
+/* 将IP地址的网络掩码转换为数字 */
 u_char
 ip_masklen (struct in_addr netmask)
 {
@@ -597,7 +598,10 @@ ip_masklen (struct in_addr netmask)
         return 32;
 }
 
-/* Apply mask to IPv4 prefix (network byte order). */
+/* Apply mask to IPv4 prefix (network byte order).
+ * 将掩码应用于IPv4前缀上,比如prefix.s_addr为192.168.1.1, mask为24
+ * 应用之后, prefix.s_addr为192.168.1.0
+ */
 void
 apply_mask_ipv4 (struct prefix_ipv4 *p)
 {

@@ -52,14 +52,16 @@ listnode_free (struct listnode *node)
   XFREE (MTYPE_LINK_NODE, node);
 }
 
-/* Add new data to the list. */
+/* Add new data to the list.
+ * 其实就是将数据添加到链表尾部
+ */
 void
 listnode_add (struct list *list, void *val)
 {
   struct listnode *node;
-  
+
   assert (val != NULL);
-  
+
   node = listnode_new ();
 
   node->prev = list->tail;
@@ -85,9 +87,9 @@ listnode_add_sort (struct list *list, void *val)
 {
   struct listnode *n;
   struct listnode *new;
-  
+
   assert (val != NULL);
-  
+
   new = listnode_new ();
   new->data = val;
 
@@ -96,7 +98,7 @@ listnode_add_sort (struct list *list, void *val)
       for (n = list->head; n; n = n->next)
 	{
 	  if ((*list->cmp) (val, n->data) < 0)
-	    {	    
+	    {
 	      new->next = n;
 	      new->prev = n->prev;
 
@@ -126,9 +128,9 @@ void
 listnode_add_after (struct list *list, struct listnode *pp, void *val)
 {
   struct listnode *nn;
-  
+
   assert (val != NULL);
-  
+
   nn = listnode_new ();
   nn->data = val;
 
@@ -309,9 +311,9 @@ void
 list_add_node_prev (struct list *list, struct listnode *current, void *val)
 {
   struct listnode *node;
-  
+
   assert (val != NULL);
-  
+
   node = listnode_new ();
   node->next = current;
   node->data = val;
@@ -332,9 +334,9 @@ void
 list_add_node_next (struct list *list, struct listnode *current, void *val)
 {
   struct listnode *node;
-  
+
   assert (val != NULL);
-  
+
   node = listnode_new ();
   node->prev = current;
   node->data = val;
