@@ -737,6 +737,8 @@ ospf_abr_translate_nssa_range (struct prefix_ipv4 *p, u_int32_t cost)
 
 /*
  * abr通告汇总lsa (type 3)到另外一个区域去
+ * 说明一下,仅有两种形式,第一种是 其他区域将type3注入到骨干区域,另外一种是骨干区域将type3注入到其他区域
+ * 再也没有其他形式了.
  */
 void
 ospf_abr_announce_network_to_area (struct prefix_ipv4 *p, u_int32_t cost,
@@ -785,6 +787,7 @@ ospf_abr_announce_network_to_area (struct prefix_ipv4 *p, u_int32_t cost,
                 zlog_debug ("ospf_abr_announce_network_to_area(): "
                             "refreshing summary");
             set_metric (old, full_cost);
+            /* ospf_lsa_refresh会进行洪泛操作 */
             lsa = ospf_lsa_refresh (area->ospf, old);
 
             if (!lsa)
@@ -808,6 +811,7 @@ ospf_abr_announce_network_to_area (struct prefix_ipv4 *p, u_int32_t cost,
         if (IS_DEBUG_OSPF_EVENT)
             zlog_debug ("ospf_abr_announce_network_to_area(): "
                         "creating new summary");
+        /* 下面的操作也会进行洪泛 */
         lsa = ospf_summary_lsa_originate ( (struct prefix_ipv4 *)p, full_cost, area);
         /* This will flood through area. */
 
@@ -911,7 +915,7 @@ ospf_abr_announce_network (struct ospf *ospf,
 
     if (IS_DEBUG_OSPF_EVENT)
         zlog_debug ("ospf_abr_announce_network(): Start");
-
+    /* or_area指代的是路由所属的区域 */
     or_area = ospf_area_lookup_by_area_id (ospf, or->u.std.area_id);
     assert (or_area);
 
@@ -1043,7 +1047,7 @@ ospf_abr_process_nssa_translates (struct ospf *ospf)
 }
 
 /*
- * 开始处理 summary-lsa的通告
+ * 开始处理 summary-lsa的通告,更加具体一点,是将area 0的信息通告给其他区域
  */
 static void
 ospf_abr_process_network_rt (struct ospf *ospf,
@@ -1111,7 +1115,8 @@ ospf_abr_process_network_rt (struct ospf *ospf,
                 zlog_debug("ospf_abr_process_network_rt(): denied by prefix-list");
             continue;
         }
-
+            /* 域间路由 */
+        /* !!!保证是骨干区域的路由 */
         if ((or->path_type == OSPF_PATH_INTER_AREA) &&
             !OSPF_IS_AREA_ID_BACKBONE (or->u.std.area_id))
         {

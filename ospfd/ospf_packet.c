@@ -2262,6 +2262,10 @@ ospf_recv_packet (int fd, struct interface **ifp, struct stream *ibuf)
 
 /*
  * 检查接口的虚链路信息
+ * @param ospf ospf实例
+ * @param ifp 收包的接口信息
+ * @param iph ip头部
+ * @param ospfh ospf报文头部
  */
 static struct ospf_interface *
 ospf_associate_packet_vl (struct ospf *ospf, struct interface *ifp,
@@ -2287,16 +2291,18 @@ ospf_associate_packet_vl (struct ospf *ospf, struct interface *ifp,
     /* 遍历接口的虚链路信息 */
     for (ALL_LIST_ELEMENTS_RO (ospf->vlinks, node, vl_data))
     {
+        /* 查找虚链路穿过的区域 */
         vl_area = ospf_area_lookup_by_area_id (ospf, vl_data->vl_area_id);
         if (!vl_area)
             continue;
 
         if (OSPF_AREA_SAME (&vl_area, &rcv_oi->area) &&
-            IPV4_ADDR_SAME (&vl_data->vl_peer, &ospfh->router_id))
+            IPV4_ADDR_SAME (&vl_data->vl_peer, &ospfh->router_id)) /* 确实是通过虚连接发来的报文 */
         {
             if (IS_DEBUG_OSPF_EVENT)
                 zlog_debug ("associating packet with %s",
                             IF_NAME (vl_data->vl_oi));
+            /* 关于这里的ifp,实际是虚拟的虚链路接口 */
             if (! CHECK_FLAG (vl_data->vl_oi->ifp->flags, IFF_UP))
             {
                 if (IS_DEBUG_OSPF_EVENT)
@@ -2890,6 +2896,7 @@ ospf_read (struct thread *thread)
      * or header area is backbone but ospf_interface is not
      * check for VLINK interface
      * 如果ospf接口为空,或者包中的区域是骨干区域,而且ospf接口所属的区域不是骨干区域
+     * 检查数据包是否经由虚链路而来
      */
     if ((oi == NULL) || (OSPF_IS_AREA_ID_BACKBONE(ospfh->area_id)
           && !OSPF_IS_AREA_ID_BACKBONE(oi->area->area_id)))
@@ -3895,7 +3902,9 @@ ospf_ls_upd_send (struct ospf_neighbor *nbr, struct list *update, int flag)
     p.family = AF_INET;
     p.prefixlen = IPV4_MAX_BITLEN;
 
-    /* Decide destination address. */
+    /* Decide destination address.
+     * 决定目的端的地址
+     */
     if (oi->type == OSPF_IFTYPE_VIRTUALLINK)
         p.prefix = oi->vl_data->peer_addr;
     else if (oi->type == OSPF_IFTYPE_POINTOPOINT)

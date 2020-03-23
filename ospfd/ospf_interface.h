@@ -107,9 +107,12 @@ struct ospf_interface;
 
 struct ospf_vl_data
 {
+    /* 对端的router-id */
     struct in_addr    vl_peer;       /* Router-ID of the peer for VLs. */
+    /* 虚链路的传输区域,也就是穿越的区域 */
     struct in_addr    vl_area_id;    /* Transit area for this VL. */
     int format;                      /* area ID format */
+    /* 这里需要说明一下vl_oi是一个虚链路接口,和已有的ospf_interface不一样 */
     struct ospf_interface *vl_oi;    /* Interface data structure for the VL. */
     struct vertex_nexthop nexthop;   /* Nexthop router and oi to use */
     struct in_addr    peer_addr;     /* Address used to reach the peer. */

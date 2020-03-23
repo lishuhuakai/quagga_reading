@@ -962,8 +962,12 @@ ospf_vl_if_delete (struct ospf_vl_data *vl_data)
 }
 
 /* Look up vl_data for given peer, optionally qualified to be in the
- * specified area. NULL area returns first found..
+ * specified area. NULL area returns first found.
+ * 给定对端的router id,查找虚链路信息
  * 查找对端的虚链路信息
+ * @param ospf ospf实例
+ * @param area 虚链路所要穿越的区域
+ * @param vl_peer 对端的router_id
  */
 struct ospf_vl_data *
 ospf_vl_lookup (struct ospf *ospf, struct ospf_area *area,
@@ -1035,6 +1039,9 @@ ospf_vl_delete (struct ospf *ospf, struct ospf_vl_data *vl_data)
     ospf_vl_data_free (vl_data);
 }
 
+/*
+ * 填充虚链路的相关信息,主要是路由信息,即如何到达对端的路由
+ */
 static int
 ospf_vl_set_params (struct ospf_vl_data *vl_data, struct vertex *v)
 {
@@ -1045,19 +1052,19 @@ ospf_vl_set_params (struct ospf_vl_data *vl_data, struct vertex *v)
     unsigned int i;
     struct router_lsa *rl;
 
-    voi = vl_data->vl_oi;
+    voi = vl_data->vl_oi; /* 虚接口 */
 
     if (voi->output_cost != v->distance)
     {
 
-        voi->output_cost = v->distance;
+        voi->output_cost = v->distance; /* 更新开销值 */
         changed = 1;
     }
 
     for (ALL_LIST_ELEMENTS_RO (v->parents, node, vp))
     {
         vl_data->nexthop.oi = vp->nexthop->oi;
-        vl_data->nexthop.router = vp->nexthop->router;
+        vl_data->nexthop.router = vp->nexthop->router; /* 走哪一条路由 */
 
         if (!IPV4_ADDR_SAME(&voi->address->u.prefix4,
                             &vl_data->nexthop.oi->address->u.prefix4))
@@ -1116,7 +1123,9 @@ ospf_vl_set_params (struct ospf_vl_data *vl_data, struct vertex *v)
     return changed;
 }
 
-
+/* 检查虚链路的状态up/down
+ * @param rid router-id
+ */
 void
 ospf_vl_up_check (struct ospf_area *area, struct in_addr rid,
                   struct vertex *v)
@@ -1133,7 +1142,7 @@ ospf_vl_up_check (struct ospf_area *area, struct in_addr rid,
         zlog_debug ("ospf_vl_up_check(): Area is %s", inet_ntoa (area->area_id));
     }
 
-    for (ALL_LIST_ELEMENTS_RO (ospf->vlinks, node, vl_data))
+    for (ALL_LIST_ELEMENTS_RO (ospf->vlinks, node, vl_data)) /* 遍历虚链路 */
     {
         if (IS_DEBUG_OSPF_EVENT)
         {
@@ -1157,7 +1166,7 @@ ospf_vl_up_check (struct ospf_area *area, struct in_addr rid,
             {
                 if (IS_DEBUG_OSPF_EVENT)
                     zlog_debug ("ospf_vl_up_check(): VL is down, waking it up");
-                SET_FLAG (oi->ifp->flags, IFF_UP);
+                SET_FLAG (oi->ifp->flags, IFF_UP); /* 接口up */
                 OSPF_ISM_EVENT_EXECUTE(oi,ISM_InterfaceUp);
             }
 
@@ -1209,6 +1218,7 @@ ospf_full_virtual_nbrs (struct ospf_area *area)
     return area->full_vls;
 }
 
+/* 获得区域内虚链路的数目 */
 int
 ospf_vls_in_area (struct ospf_area *area)
 {

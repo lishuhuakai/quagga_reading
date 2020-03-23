@@ -558,6 +558,9 @@ ospf_flood_through_interface (struct ospf_interface *oi,
 
 /*
  * 在整个area内洪泛lsa
+ * @param area lsa所属的区域
+ * type-3的lsa的洪泛只有两种情况,一种是   area x (x != 0) -> area 0
+ * 另外一种是 area 0 -> area x (x != 0),没有area x (x != 0) -> area y (y != 0)
  */
 int
 ospf_flood_through_area (struct ospf_area *area,
@@ -573,6 +576,9 @@ ospf_flood_through_area (struct ospf_area *area,
        links.  */
     for (ALL_LIST_ELEMENTS (area->oiflist, node, nnode, oi)) /* 遍历区域的接口列表 */
     {
+        /* 区域不是骨干区域,而且ospf接口是虚链路,就不会进行洪泛
+         * 也就是说,虚链路只接受骨干区域的lsa
+         */
         if (area->area_id.s_addr != OSPF_AREA_BACKBONE &&
             oi->type ==  OSPF_IFTYPE_VIRTUALLINK)
             continue;

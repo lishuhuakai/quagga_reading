@@ -781,6 +781,7 @@ ospf_vl_config_data_init (struct ospf_vl_config_data *vl_config,
     vl_config->vty = vty;
 }
 
+/* 根据虚链路的配置查找虚链路 */
 static struct ospf_vl_data *
 ospf_find_vl_data (struct ospf *ospf, struct ospf_vl_config_data *vl_config)
 {
@@ -825,6 +826,11 @@ ospf_find_vl_data (struct ospf *ospf, struct ospf_vl_config_data *vl_config)
         {
             vl_data->vl_oi = ospf_vl_new (ospf, vl_data);
             ospf_vl_add (ospf, vl_data);
+            /* 这里我要说明一下,vl_data现在的路由信息是空的,也就是说,可能对端压根就不可达
+             * 通过lsa计算路由信息,如果找到了对端的lsa,从而就可以认为,虚接口是up的,而且可以填充
+             * 到达peer的路由信息到vl_data里面(ospf_vl_up_check函数处理),只有虚接口是up状态,才能接收
+             * 虚链路的包(收包的时候ospf_associate_packet_vl会检查)
+             */
             ospf_spf_calculate_schedule (ospf, SPF_FLAG_CONFIG_CHANGE);
         }
     }
@@ -996,6 +1002,7 @@ ospf_vl_set (struct ospf *ospf, struct ospf_vl_config_data *vl_config)
        "Use MD5 algorithm\n" \
        "The OSPF password (key)"
 
+/* 添加虚链路 */
 DEFUN (ospf_area_vlink,
        ospf_area_vlink_cmd,
        "area (A.B.C.D|<0-4294967295>) virtual-link A.B.C.D",
@@ -1020,7 +1027,7 @@ DEFUN (ospf_area_vlink,
         return CMD_WARNING;
     }
 
-    ret = inet_aton (argv[1], &vl_config.vl_peer);
+    ret = inet_aton (argv[1], &vl_config.vl_peer); /* 对端的router-id */
     if (! ret)
     {
         vty_out (vty, "Please specify valid Router ID as a.b.c.d%s",
