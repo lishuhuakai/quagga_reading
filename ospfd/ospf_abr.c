@@ -737,8 +737,7 @@ ospf_abr_translate_nssa_range (struct prefix_ipv4 *p, u_int32_t cost)
 
 /*
  * abr通告汇总lsa (type 3)到另外一个区域去
- * 说明一下,仅有两种形式,第一种是 其他区域将type3注入到骨干区域,另外一种是骨干区域将type3注入到其他区域
- * 再也没有其他形式了.
+ * @param area 待通告的区域
  */
 void
 ospf_abr_announce_network_to_area (struct prefix_ipv4 *p, u_int32_t cost,
@@ -904,6 +903,7 @@ ospf_abr_plist_out_check (struct ospf_area *area, struct ospf_route *or,
 
 /*
  * abr给一个区域通告别的区域的路由信息
+ * @param or 待通告的路由信息
  */
 static void
 ospf_abr_announce_network (struct ospf *ospf,
@@ -915,7 +915,7 @@ ospf_abr_announce_network (struct ospf *ospf,
 
     if (IS_DEBUG_OSPF_EVENT)
         zlog_debug ("ospf_abr_announce_network(): Start");
-    /* or_area指代的是路由所属的区域 */
+    /* or_area指代的是路由所属的区域,也就是通告此路由的区域 */
     or_area = ospf_area_lookup_by_area_id (ospf, or->u.std.area_id);
     assert (or_area);
 
@@ -948,7 +948,7 @@ ospf_abr_announce_network (struct ospf *ospf,
                             inet_ntoa (p->prefix), p->prefixlen);
             continue;
         }
-
+        /* 此区域不需要summary lsa直接跳过 */
         if (area->external_routing != OSPF_AREA_DEFAULT && area->no_summary)
         {
             if (IS_DEBUG_OSPF_EVENT)
@@ -957,14 +957,16 @@ ospf_abr_announce_network (struct ospf *ospf,
                             inet_ntoa (area->area_id));
             continue;
         }
-
+        /* 域间路由,指的是目的地在其他区域,至少要经过abr才能到达 */
         if (or->path_type == OSPF_PATH_INTER_AREA)
         {
             if (IS_DEBUG_OSPF_EVENT)
                 zlog_debug ("ospf_abr_announce_network(): this is "
                             "inter-area route to %s/%d",
                             inet_ntoa (p->prefix), p->prefixlen);
-            /* 这里需要说明的是,每次只通告一条type 3的路由信息 */
+            /* 这里需要说明的是,每次只通告一条type 3的路由信息
+             * 将路由通告到非来源区域,非骨干区域
+             */
             if (!OSPF_IS_AREA_BACKBONE (area))
                 ospf_abr_announce_network_to_area (p, or->cost, area);
         }
@@ -1047,7 +1049,8 @@ ospf_abr_process_nssa_translates (struct ospf *ospf)
 }
 
 /*
- * 开始处理 summary-lsa的通告,更加具体一点,是将area 0的信息通告给其他区域
+ * 开始处理 summary-lsa的通告
+ * @param rt 网络路由表
  */
 static void
 ospf_abr_process_network_rt (struct ospf *ospf,
@@ -1115,8 +1118,7 @@ ospf_abr_process_network_rt (struct ospf *ospf,
                 zlog_debug("ospf_abr_process_network_rt(): denied by prefix-list");
             continue;
         }
-            /* 域间路由 */
-        /* !!!保证是骨干区域的路由 */
+        /* 域间路由,而且由非骨干区域,不处理 */
         if ((or->path_type == OSPF_PATH_INTER_AREA) &&
             !OSPF_IS_AREA_ID_BACKBONE (or->u.std.area_id))
         {

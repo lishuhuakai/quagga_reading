@@ -558,9 +558,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
 
 /*
  * 在整个area内洪泛lsa
- * @param area lsa所属的区域
- * type-3的lsa的洪泛只有两种情况,一种是   area x (x != 0) -> area 0
- * 另外一种是 area 0 -> area x (x != 0),没有area x (x != 0) -> area y (y != 0)
+ * @param area 待洪泛lsa的区域
  */
 int
 ospf_flood_through_area (struct ospf_area *area,

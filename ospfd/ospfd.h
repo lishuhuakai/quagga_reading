@@ -342,7 +342,7 @@ struct ospf_area
 
     u_char transit;           /* TransitCapability. */
 #define OSPF_TRANSIT_FALSE      0
-#define OSPF_TRANSIT_TRUE       1
+#define OSPF_TRANSIT_TRUE       1 /* 传输区域,表示区域存在虚链路 */
     /* 记录路由汇聚规则 */
     struct route_table *ranges;       /* Configured Area Ranges. */
 

@@ -881,7 +881,7 @@ ospf_spf_next (struct vertex *v, struct ospf_area *area,
     {
         /* 虚链路 */
         if (IS_ROUTER_LSA_VIRTUAL ((struct router_lsa *) v->lsa))
-            area->transit = OSPF_TRANSIT_TRUE; /* 是一个传输网络?? */
+            area->transit = OSPF_TRANSIT_TRUE; /* 是一个传输网络区域 */
     }
 
     if (IS_DEBUG_OSPF_EVENT)
@@ -1432,7 +1432,9 @@ ospf_spf_calculate_timer (struct thread *thread)
     ospf_vl_shut_unapproved (ospf);
 
     start_time = stop_time;   /* saving a call */
-    /* 下面这个函数很重要,包含了路由汇聚的内容 */
+    /* 下面这个函数很重要,包含了路由汇聚的内容
+     * 利用type3和type4的lsa,生成路由
+     */
     ospf_ia_routing (ospf, new_table, new_rtrs);
 
     quagga_gettime (QUAGGA_CLK_MONOTONIC, &stop_time);

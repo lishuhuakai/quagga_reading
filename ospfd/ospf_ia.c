@@ -210,6 +210,8 @@ ospf_ia_router_route (struct ospf *ospf, struct route_table *rtrs,
  * 处理 summary-lsa
  * @param area 对应的区域
  * @param lsa
+ * @param rt 网络路由表
+ * @param rtrs 到路由器的路由表
  */
 static int
 process_summary_lsa (struct ospf_area *area, struct route_table *rt,
@@ -288,7 +290,7 @@ process_summary_lsa (struct ospf_area *area, struct route_table *rt,
     new_or->u.std.external_routing = area->external_routing;
     new_or->path_type = OSPF_PATH_INTER_AREA; /* 域间路由 */
 
-    if (sl->header.type == OSPF_SUMMARY_LSA)
+    if (sl->header.type == OSPF_SUMMARY_LSA) /* type3生成的路由放入rt中 */
         ospf_ia_network_route (ospf, rt, &p, new_or, abr_or);
     else
     {
@@ -620,7 +622,10 @@ ospf_examine_transit_summaries (struct ospf_area *area,
     process_transit_summary_lsa (area, rt, rtrs, lsa);
 }
 
-/* 处理域间路由路由 */
+/* 生成域间路由路由,利用summary_lsa (type 3以及type 4)
+ * @param rt 网络路由
+ * @param rtrs 到路由器的路由
+ */
 void
 ospf_ia_routing (struct ospf *ospf,
                  struct route_table *rt,
@@ -633,6 +638,9 @@ ospf_ia_routing (struct ospf *ospf,
 
     if (IS_OSPF_ABR (ospf)) /* 如果路由器为abr */
     {
+        /* ABR会忽略从从非骨干区域收到的type-3/4 lsa,只会放入lsdb
+         * 而不会用其生成路由.
+         */
         struct listnode *node;
         struct ospf_area *area;
 
@@ -642,7 +650,7 @@ ospf_ia_routing (struct ospf *ospf,
                 if (IS_DEBUG_OSPF_EVENT)
                     zlog_debug ("ospf_ia_routing():Standard ABR");
 
-                if ((area = ospf->backbone))
+                if ((area = ospf->backbone)) /* 只处理骨干区域 */
                 {
                     struct listnode *node;
 
@@ -653,7 +661,7 @@ ospf_ia_routing (struct ospf *ospf,
                     }
                     /* 处理type-3和type-4的lsa,生成路由信息 */
                     OSPF_EXAMINE_SUMMARIES_ALL (area, rt, rtrs);
-
+                    /* 有一个例外,那就是虚链路,会利用虚链路传递过来的type3/4 的lsa来生成路由 */
                     for (ALL_LIST_ELEMENTS_RO (ospf->areas, node, area))
                         if (area != ospf->backbone)
                             if (ospf_area_is_transit (area))
