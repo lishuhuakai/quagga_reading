@@ -1975,7 +1975,11 @@ ospf_translated_nssa_originate (struct ospf *ospf, struct ospf_lsa *type7)
     return new;
 }
 
-/* Refresh Translated from NSSA AS-external-LSA. */
+/* Refresh Translated from NSSA AS-external-LSA.
+ * 刷新从type-7转换而来的type-5类型的lsa
+ * @param type7 type-7类型的lsa
+ * @param type5 type-5类型的lsa
+ */
 struct ospf_lsa *
 ospf_translated_nssa_refresh (struct ospf *ospf, struct ospf_lsa *type7,
                               struct ospf_lsa *type5)

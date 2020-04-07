@@ -480,7 +480,7 @@ ospf_nbr_add (struct ospf_interface *oi, struct ospf_header *ospfh,
 
     /* New nbr, save the crypto sequence number if necessary */
     if (ntohs (ospfh->auth_type) == OSPF_AUTH_CRYPTOGRAPHIC)
-        nbr->crypt_seqnum = ospfh->u.crypt.crypt_seqnum;
+        nbr->crypt_seqnum = ospfh->u.crypt.crypt_seqnum; /* 采用md5的方式进行认证 */
 
     if (IS_DEBUG_OSPF_EVENT)
         zlog_debug ("NSM[%s:%s]: start", IF_NAME (nbr->oi),

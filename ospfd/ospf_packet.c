@@ -903,7 +903,7 @@ ospf_hello (struct ip *iph, struct ospf_header *ospfh,
     }
 #endif /* REJECT_IF_TBIT_ON */
 
-    if (CHECK_FLAG (oi->ospf->config, OSPF_OPAQUE_CAPABLE)
+    if (CHECK_FLAG (oi->ospf->config, OSPF_OPAQUE_CAPABLE) /* 支持opaque lsa */
         && CHECK_FLAG (hello->options, OSPF_OPTION_O))
     {
         /*
@@ -920,10 +920,14 @@ ospf_hello (struct ip *iph, struct ospf_header *ospfh,
     }
 
     /* new for NSSA is to ensure that NP is on and E is off */
-
-    if (oi->area->external_routing == OSPF_AREA_NSSA)
+    /* N-bit 一台路由器设置N-bit=1表示它支持type-7的lsa,如果N-bit=0,路由器将不接收和
+     * 发送type-7的lsa,邻居路由器如果错误配置了N-bit,会导致无法形成邻接关系,这个限制
+     * 可以确保一个区域内的所有路由器同样地支持NSSA的能力,如果N-bit=1,E-bit必须为1.
+     * E-bit 一台路由器设置E-bit=1表示它支持type-5的lsa
+     */
+    if (oi->area->external_routing == OSPF_AREA_NSSA) /* 区域为nssa区域 */
     {
-        if (! (CHECK_FLAG (OPTIONS (oi), OSPF_OPTION_NP)
+        if (!(CHECK_FLAG (OPTIONS (oi), OSPF_OPTION_NP)
                && CHECK_FLAG (hello->options, OSPF_OPTION_NP)
                && ! CHECK_FLAG (OPTIONS (oi), OSPF_OPTION_E)
                && ! CHECK_FLAG (hello->options, OSPF_OPTION_E)))
@@ -1878,7 +1882,7 @@ ospf_ls_upd (struct ospf *ospf, struct ip *iph, struct ospf_header *ospfh,
          and none of router's neighbors are in states Exchange or Loading,
          then take the following actions:
          * 如果lsa的已经到达了老化时间, 并且在的当前的链路状态数据库中也没有这个lsa的实例了
-         * 而且路由器的邻居也没有一个处在Exchange或者Loading状态,执行下面的操作
+         * 而且路由器的邻居也没有一个处在Exchange或者Loading状态,(没有邻居在同步lsa)执行下面的操作
          */
 
         if (IS_LSA_MAXAGE (lsa) && !current &&
@@ -2381,7 +2385,7 @@ ospf_check_auth (struct ospf_interface *oi, struct ospf_header *ospfh)
                 return 0;
             }
             return 1;
-        case OSPF_AUTH_SIMPLE: /* RFC2328 D.5.2 */
+        case OSPF_AUTH_SIMPLE: /* RFC2328 D.5.2 简单的明文认证 */
             if (OSPF_AUTH_SIMPLE != (iface_auth_type = ospf_auth_type (oi)))
             {
                 if (IS_DEBUG_OSPF_PACKET (ospfh->type - 1, RECV))
@@ -2389,6 +2393,7 @@ ospf_check_auth (struct ospf_interface *oi, struct ospf_header *ospfh)
                                IF_NAME (oi), LOOKUP (ospf_auth_type_str, iface_auth_type));
                 return 0;
             }
+            /* 直接比较密钥的参数值 */
             if (memcmp (OSPF_IF_PARAM (oi, auth_simple), ospfh->u.auth_data, OSPF_AUTH_SIMPLE_SIZE))
             {
                 if (IS_DEBUG_OSPF_PACKET (ospfh->type - 1, RECV))
@@ -2403,7 +2408,7 @@ ospf_check_auth (struct ospf_interface *oi, struct ospf_header *ospfh)
                 return 0;
             }
             return 1;
-        case OSPF_AUTH_CRYPTOGRAPHIC: /* RFC2328 D.5.3 */
+        case OSPF_AUTH_CRYPTOGRAPHIC: /* RFC2328 D.5.3 MD5类型的认证 */
             if (OSPF_AUTH_CRYPTOGRAPHIC != (iface_auth_type = ospf_auth_type (oi)))
             {
                 if (IS_DEBUG_OSPF_PACKET (ospfh->type - 1, RECV))
@@ -2764,7 +2769,9 @@ ospf_packet_examin (struct ospf_header * oh, const unsigned bytesonwire)
     return ret;
 }
 
-/* OSPF Header verification. */
+/* OSPF Header verification.
+ * 检查OSPF头部
+ */
 static int
 ospf_verify_header (struct stream *ibuf, struct ospf_interface *oi,
                     struct ip *iph, struct ospf_header *ospfh)
@@ -3887,6 +3894,7 @@ ospf_ls_upd_send_queue_event (struct thread *thread)
 
 /*
  * 向邻居发送lsa更新消息
+ * @param update 待发送的lsa的构成的链表
  */
 void
 ospf_ls_upd_send (struct ospf_neighbor *nbr, struct list *update, int flag)

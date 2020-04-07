@@ -354,7 +354,10 @@ ospf_act_bb_connection (struct ospf *ospf)
     return ospf->backbone->full_nbrs;
 }
 
-/* Determine whether this router is elected translator or not for area */
+/* Determine whether this router is elected translator or not for area
+ * 判断此路由器是否被选举成为此区域的translator
+ * 成功的话,返回1,否则返回0
+ */
 static int
 ospf_abr_nssa_am_elected (struct ospf_area *area)
 {
@@ -363,22 +366,22 @@ ospf_abr_nssa_am_elected (struct ospf_area *area)
     struct router_lsa *rlsa;
     struct in_addr *best = NULL;
 
-    LSDB_LOOP ( ROUTER_LSDB (area), rn, lsa)
+    LSDB_LOOP (ROUTER_LSDB (area), rn, lsa) /* 遍历router-lsa */
     {
         /* sanity checks */
         if (!lsa
             || (lsa->data->type != OSPF_ROUTER_LSA)
-            || IS_LSA_SELF (lsa))
+            || IS_LSA_SELF (lsa)) /* 只考虑router_lsa,不考虑自己产生的lsa */
             continue;
 
         rlsa = (struct router_lsa *) lsa->data;
 
         /* ignore non-ABR routers */
-        if (!IS_ROUTER_LSA_BORDER (rlsa))
+        if (!IS_ROUTER_LSA_BORDER (rlsa)) /* 去掉非abr */
             continue;
 
         /* Router has Nt flag - always translate */
-        if (IS_ROUTER_LSA_NT (rlsa))
+        if (IS_ROUTER_LSA_NT (rlsa)) /* 已经存在translate了 */
         {
             if (IS_DEBUG_OSPF_NSSA)
                 zlog_debug ("ospf_abr_nssa_am_elected: "
@@ -407,6 +410,8 @@ ospf_abr_nssa_am_elected (struct ospf_area *area)
 }
 
 /* Check NSSA ABR status
+ * 检查本路由器是否为NSSA ABR -- 即是否进行type-7转换为type-5的动作
+ * 如果是,ospf->flag将打上 OSPF_FLAG_ASBR标记,否则清除标记
  * assumes there are nssa areas
  */
 static void
@@ -419,7 +424,7 @@ ospf_abr_nssa_check_status (struct ospf *ospf)
     {
         u_char old_state = area->NSSATranslatorState;
 
-        if (area->external_routing != OSPF_AREA_NSSA)
+        if (area->external_routing != OSPF_AREA_NSSA) /* NSSA区域 */
             continue;
 
         if (IS_DEBUG_OSPF (nssa, NSSA))
@@ -427,16 +432,17 @@ ospf_abr_nssa_check_status (struct ospf *ospf)
                         "checking area %s",
                         inet_ntoa (area->area_id));
 
-        if (!IS_OSPF_ABR (area->ospf))
+        if (!IS_OSPF_ABR (area->ospf)) /* 如果不是abr */
         {
             if (IS_DEBUG_OSPF (nssa, NSSA))
                 zlog_debug ("ospf_abr_nssa_check_status: "
                             "not ABR");
-            area->NSSATranslatorState = OSPF_NSSA_TRANSLATE_DISABLED;
+
+            area->NSSATranslatorState = OSPF_NSSA_TRANSLATE_DISABLED; /* 就不进行转换 */
         }
-        else
+        else /* 如果区域是abr */
         {
-            switch (area->NSSATranslatorRole)
+            switch (area->NSSATranslatorRole) /* 根据角色来判断是否进行转换 */
             {
                 case OSPF_NSSA_ROLE_NEVER:
                     /* We never Translate Type-7 LSA. */
@@ -447,7 +453,7 @@ ospf_abr_nssa_check_status (struct ospf *ospf)
                     area->NSSATranslatorState = OSPF_NSSA_TRANSLATE_DISABLED;
                     break;
 
-                case OSPF_NSSA_ROLE_ALWAYS:
+                case OSPF_NSSA_ROLE_ALWAYS: /* 总是将type-5转换成type-7 */
                     /* We always translate if we are an ABR
                      * TODO: originate new LSAs if state change?
                      * or let the nssa abr task take care of it?
@@ -458,7 +464,7 @@ ospf_abr_nssa_check_status (struct ospf *ospf)
                     area->NSSATranslatorState = OSPF_NSSA_TRANSLATE_ENABLED;
                     break;
 
-                case OSPF_NSSA_ROLE_CANDIDATE:
+                case OSPF_NSSA_ROLE_CANDIDATE: /* 参与nssa translator的选举 */
                     /* We are a candidate for Translation */
                     if (ospf_abr_nssa_am_elected (area) > 0)
                     {
@@ -480,12 +486,14 @@ ospf_abr_nssa_check_status (struct ospf *ospf)
          * All NSSA border routers must set the E-bit in the Type-1 router-LSAs
          * of their directly attached non-stub areas, even when they are not
          * translating.
+         * 所有的NSSA 边界路由器必须在Type-1 的router-lsa中设置E-bit
          */
         if (old_state != area->NSSATranslatorState)
         {
+            /* 原来不允许转换 */
             if (old_state == OSPF_NSSA_TRANSLATE_DISABLED)
                 ospf_asbr_status_update (ospf, ++ospf->redistribute);
-            else if (area->NSSATranslatorState == OSPF_NSSA_TRANSLATE_DISABLED)
+            else if (area->NSSATranslatorState == OSPF_NSSA_TRANSLATE_DISABLED) /* 原来允许转换,现在不允许转换 */
                 ospf_asbr_status_update (ospf, --ospf->redistribute);
         }
     }
@@ -493,6 +501,7 @@ ospf_abr_nssa_check_status (struct ospf *ospf)
 
 /* Check area border router status.
  * 检查区域边界路由器的状态,或者说检查一下,本路由器是不是ABR
+ * 如果是的话,ospf->flag会打上OSPF_FLAG_ABR标记,否则清除
  */
 void
 ospf_check_abr_status (struct ospf *ospf)
@@ -639,6 +648,10 @@ set_metric (struct ospf_lsa *lsa, u_int32_t metric)
 }
 
 /* ospf_abr_translate_nssa */
+/*
+ * @param area 区域
+ * @param lsa 待转换的lsa
+ */
 static int
 ospf_abr_translate_nssa (struct ospf_area *area, struct ospf_lsa *lsa)
 {
@@ -652,7 +665,8 @@ ospf_abr_translate_nssa (struct ospf_area *area, struct ospf_lsa *lsa)
      *
      *  Later, any Unapproved Translated Type-5's are flushed/discarded
      */
-
+    /* 关于LSA中的P-bit,这个标记只会在type-7的lsa中出现,标记上了,说明允许将此lsa转换成type-5
+     * 否则不允许 */
     struct ospf_lsa *old = NULL,
                          *new = NULL;
     struct as_external_lsa *ext7;
@@ -704,7 +718,7 @@ ospf_abr_translate_nssa (struct ospf_area *area, struct ospf_lsa *lsa)
                             inet_ntoa (old->data->id));
         }
     }
-    else
+    else /* 如果没有找到 */
     {
         /* no existing external route for this LSA Id
          * originate translated LSA
@@ -754,7 +768,7 @@ ospf_abr_announce_network_to_area (struct prefix_ipv4 *p, u_int32_t cost,
         full_cost = OSPF_STUB_MAX_METRIC_SUMMARY_COST;
     else
         full_cost = cost;
-
+    /* 首先查找老的lsa */
     old = ospf_lsa_lookup_by_prefix (area->lsdb, OSPF_SUMMARY_LSA,
                                      (struct prefix_ipv4 *) p,
                                      area->ospf->router_id);
@@ -930,7 +944,7 @@ ospf_abr_announce_network (struct ospf *ospf,
         /* 判断路由的下一跳是否属于此区域 */
         if (ospf_abr_nexthops_belong_to_area (or, area))
             continue;
-
+        /* 此条路由信息如果不被导出到其他区域 */
         if (!ospf_abr_should_accept (p, area))
         {
             if (IS_DEBUG_OSPF_EVENT)
@@ -987,6 +1001,7 @@ ospf_abr_announce_network (struct ospf *ospf,
     }
 }
 
+/* 判断路由应不应该被导出 */
 static int
 ospf_abr_should_announce (struct ospf *ospf,
                           struct prefix_ipv4 *p, struct ospf_route *or)
@@ -1019,6 +1034,9 @@ ospf_abr_process_nssa_translates (struct ospf *ospf)
        flood install as approved in Type-5 LSDB with XLATE Flag on
        later, do same for all aggregates...  At end, DISCARD all
        remaining UNAPPROVED Type-5's (Aggregate is for future ) */
+    /* 遍历所有NSSA区域的NSSA_LSDB中的lsa,如果P-bit被设定了,需要将这条lsa转换成type-5类型
+     * 转换后的lsa会带上XLATE标记,并且会被洪泛
+     */
     struct listnode *node;
     struct ospf_area *area;
     struct route_node *rn;
@@ -1029,7 +1047,7 @@ ospf_abr_process_nssa_translates (struct ospf *ospf)
 
     for (ALL_LIST_ELEMENTS_RO (ospf->areas, node, area))
     {
-        if (! area->NSSATranslatorState)
+        if (! area->NSSATranslatorState) /* 必须要允许转换 */
             continue; /* skip if not translator */
 
         if (area->external_routing != OSPF_AREA_NSSA)
@@ -1038,7 +1056,7 @@ ospf_abr_process_nssa_translates (struct ospf *ospf)
         if (IS_DEBUG_OSPF_NSSA)
             zlog_debug ("ospf_abr_process_nssa_translates(): "
                         "looking at area %s", inet_ntoa (area->area_id));
-
+        /* 下面的循环,主要用于将type-7类型的lsa转换成type-5类型的lsa,并洪泛出去 */
         LSDB_LOOP (NSSA_LSDB (area), rn, lsa)
         ospf_abr_translate_nssa (area, lsa);
     }
@@ -1079,7 +1097,7 @@ ospf_abr_process_network_rt (struct ospf *ospf,
         if (IS_DEBUG_OSPF_EVENT)
             zlog_debug ("ospf_abr_process_network_rt(): this is a route to %s/%d",
                         inet_ntoa (rn->p.u.prefix4), rn->p.prefixlen);
-        if (or->path_type >= OSPF_PATH_TYPE1_EXTERNAL)
+        if (or->path_type >= OSPF_PATH_TYPE1_EXTERNAL) /* 外部路由 */
         {
             if (IS_DEBUG_OSPF_EVENT)
                 zlog_debug ("ospf_abr_process_network_rt(): "
@@ -1103,6 +1121,7 @@ ospf_abr_process_network_rt (struct ospf *ospf,
             continue;
         }
 
+        /* 域内路由 */
         if (or->path_type == OSPF_PATH_INTRA_AREA &&
             !ospf_abr_should_announce (ospf, (struct prefix_ipv4 *) &rn->p, or))
         {
@@ -1378,6 +1397,7 @@ ospf_abr_process_router_rt (struct ospf *ospf, struct route_table *rt)
         zlog_debug ("ospf_abr_process_router_rt(): Stop");
 }
 
+/* 将每一个由type7转换而来的lsa去掉approved标记 */
 static void
 ospf_abr_unapprove_translates (struct ospf *ospf) /* For NSSA Translations */
 {
@@ -1464,9 +1484,10 @@ ospf_abr_prepare_aggregates (struct ospf *ospf)
 
     for (ALL_LIST_ELEMENTS_RO (ospf->areas, node, area))
     {
-        for (rn = route_top (area->ranges); rn; rn = route_next (rn))
+        for (rn = route_top (area->ranges); rn; rn = route_next (rn)) /* 遍历每一条聚合规则 */
             if ((range = rn->info) != NULL)
             {
+                /* 重置相关信息 */
                 range->cost = 0;
                 range->specifics = 0;
             }
@@ -1582,7 +1603,7 @@ ospf_abr_send_nssa_aggregates (struct ospf *ospf) /* temporarily turned off */
             zlog_debug ("ospf_abr_send_nssa_aggregates(): looking at area %s",
                         inet_ntoa (area->area_id));
 
-        for (rn = route_top (area->ranges); rn; rn = route_next (rn))
+        for (rn = route_top (area->ranges); rn; rn = route_next (rn)) /* 路由汇聚 */
         {
             if (rn->info == NULL)
                 continue;
@@ -1795,10 +1816,10 @@ ospf_abr_nssa_task (struct ospf *ospf) /* called only if any_nssa */
     if (IS_DEBUG_OSPF_NSSA)
         zlog_debug ("Check for NSSA-ABR Tasks():");
 
-    if (! IS_OSPF_ABR (ospf))
+    if (!IS_OSPF_ABR (ospf))
         return;
 
-    if (! ospf->anyNSSA)
+    if (! ospf->anyNSSA) /* 如果不存在nssa区域,就退出 */
         return;
 
     /* Each area must confirm TranslatorRole */
@@ -1831,6 +1852,7 @@ ospf_abr_nssa_task (struct ospf *ospf) /* called only if any_nssa */
      */
     if (IS_DEBUG_OSPF_NSSA)
         zlog_debug("ospf_abr_nssa_task(): send NSSA aggregates");
+    /* 下面的函数暂时什么也没有干 */
     ospf_abr_send_nssa_aggregates (ospf);  /*TURNED OFF FOR NOW */
 
     /* Send any NSSA defaults as Type-5
@@ -1890,6 +1912,9 @@ ospf_abr_task (struct ospf *ospf)
             zlog_debug ("ospf_abr_task(): announce aggregates");
         /* 这里说明一句,前面的ospf_abr_unapprove_summaries将所有自己产生的type-5以及type-7
          * 的lsa标记为了unapproved状态,下面的函数进行相关的检查,检查通过的lsa会标记为approved
+         * 为什么会有approved这个标记呢?因为过滤器,一条lsa可能之前是可以通告的,但是过滤器变化了之后,就不能再次
+         * 通告了,下面的函数将过滤过的,成功通告出去了的都打上了approved标记,其余的都没有打上approved标记,表示这些
+         * lsa不再需要,然后在下面的remove_unapproved_summaries函数中,将没有approved标记的type-3的lsa老化掉
          */
         ospf_abr_announce_aggregates (ospf);
 
@@ -1923,6 +1948,7 @@ ospf_abr_task_timer (struct thread *thread)
     ospf_abr_nssa_check_status (ospf);
 
     ospf_abr_task (ospf);
+    /* 如果是nssa区域的abr */
     ospf_abr_nssa_task (ospf); /* if nssa-abr, then scan Type-7 LSDB */
 
     return 0;

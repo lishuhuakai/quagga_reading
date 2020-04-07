@@ -124,6 +124,7 @@ struct ospf
 #define OSPF_ABR_DEFAULT    OSPF_ABR_CISCO
 
     /* NSSA ABR */
+    /* anyNSSA是一个计数器,每有一个区域被配置成NSSA区域的话,这个值就会+1 */
     u_char anyNSSA;       /* Bump for every NSSA attached. */
 
     /* Configured variables. */
@@ -321,6 +322,13 @@ struct ospf_area
 #define OSPF_AREA_STUB          1
 #define OSPF_AREA_NSSA          2
 #define OSPF_AREA_TYPE_MAX  3
+    /* 关于no_summary,no_summary为1表示不允许在这个区域注入type-3的lsa,
+     * external_routing   no_summary   area_type      不允许注入lsa类型          路由重发布
+     *    stub               0            stub          type4,5             no
+     *    stub               1          totally stub    type3,4,5           no
+     *    nssa               0            naas          type4,5             yes
+     *    nssa               1           totally nssa   type3,4,5           yes
+     */
     int no_summary;                       /* Don't inject summaries into stub.*/
     int shortcut_configured;              /* Area configured as shortcut. */
 #define OSPF_SHORTCUT_DEFAULT   0
@@ -332,9 +340,10 @@ struct ospf_area
 
 
     u_char NSSATranslatorRole;          /* NSSA configured role */
-#define OSPF_NSSA_ROLE_NEVER     0
+#define OSPF_NSSA_ROLE_NEVER     0 /* 不转换type-7 */
 #define OSPF_NSSA_ROLE_CANDIDATE 1
 #define OSPF_NSSA_ROLE_ALWAYS    2
+    /* NSSATranslator用于将type-7的lsa转换成type-5 */
     u_char NSSATranslatorState;              /* NSSA operational role */
 #define OSPF_NSSA_TRANSLATE_DISABLED 0
 #define OSPF_NSSA_TRANSLATE_ENABLED  1

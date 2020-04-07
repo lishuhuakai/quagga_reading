@@ -256,6 +256,7 @@ ospf_external_info_find_lsa (struct ospf *ospf,
 
 /* Update ASBR status.
  * 更新ASBR状态
+ * 所谓ASBR,值得是能够产生type5 lsa的路由器
  */
 void
 ospf_asbr_status_update (struct ospf *ospf, u_char status)
@@ -273,7 +274,7 @@ ospf_asbr_status_update (struct ospf *ospf, u_char status)
         }
         SET_FLAG (ospf->flags, OSPF_FLAG_ASBR);
     }
-    else
+    else /* 不再是ASBR */
     {
         /* Already non ASBR. */
         if (! IS_OSPF_ASBR (ospf))

@@ -1240,6 +1240,7 @@ ospf_area_shortcut_unset (struct ospf *ospf, struct ospf_area *area)
     return 1;
 }
 
+/* 获得虚链路的数目 */
 static int
 ospf_area_vlink_count (struct ospf *ospf, struct ospf_area *area)
 {

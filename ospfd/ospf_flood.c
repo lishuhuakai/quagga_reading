@@ -226,6 +226,13 @@ ospf_process_self_originated_lsa (struct ospf *ospf,
         non-ABRs calculate external routes from Type-7's
         ABRs calculate external routes from Type-5's and non-self Type-7s
 */
+
+/*
+ * @param ospf ospf实例
+ * @param nbr lsa从此邻居处接收
+ * @param current 当前lsdb中的lsa
+ * @param new 新的lsa
+ */
 int
 ospf_flood (struct ospf *ospf, struct ospf_neighbor *nbr,
             struct ospf_lsa *current, struct ospf_lsa *new)
@@ -293,6 +300,9 @@ ospf_flood (struct ospf *ospf, struct ospf_neighbor *nbr,
         {
             case OSPF_AS_EXTERNAL_LSA:
             case OSPF_OPAQUE_AS_LSA:
+                /* 新的lsa已经洪泛出去,要将老的从重传链表中移除
+                 * type-5的lsa会洪泛整个区域
+                 */
                 ospf_ls_retransmit_delete_nbr_as (ospf, current);
                 break;
             default:
@@ -337,7 +347,8 @@ ospf_flood (struct ospf *ospf, struct ospf_neighbor *nbr,
 
 /* OSPF LSA flooding -- RFC2328 Section 13.3. */
 /* 通过ospf接口来洪泛lsa
- * @inbr 表示lsa从此邻居处接收 in neighbor
+ * @param inbr 表示lsa从此邻居处接收 in neighbor
+ * @param oi 待洪泛的物理接口
  */
 static int
 ospf_flood_through_interface (struct ospf_interface *oi,
@@ -437,7 +448,9 @@ ospf_flood_through_interface (struct ospf_interface *oi,
         }
 
         /* If the new LSA was received from this neighbor,
-        examine the next neighbor. */
+        examine the next neighbor.
+        * 如果更新从onbr邻居处收到,忽略此邻居,检查下一个邻居.
+        */
 #ifdef ORIGINAL_CODING
         if (inbr)
             if (IPV4_ADDR_SAME (&inbr->router_id, &onbr->router_id))
@@ -475,7 +488,9 @@ ospf_flood_through_interface (struct ospf_interface *oi,
         for the adjacency. The LSA will be retransmitted
          at intervals until an acknowledgment is seen from
          the neighbor. */
-        /* 将新的lsa加入链路状态重传链表中  */
+        /* 将新的lsa加入链路状态重传链表中
+         * 这里说明一下,DROther是收不到非DR发来的更新的,这意味着,DROther不会在此网段内转发此LSA
+         */
         ospf_ls_retransmit_add (onbr, lsa);
         retx_flag = 1;
     }
@@ -510,7 +525,10 @@ ospf_flood_through_interface (struct ospf_interface *oi,
         interface state is Backup, examine the next interface.  The
          Designated Router will do the flooding on this interface.
          However, if the Designated Router fails the router will
-         end up retransmitting the updates. */
+         end up retransmitting the updates.
+        * 如果从接口上收到了新的lsa,接口状态是BDR,检查下一个接口,DR会在这个接口上洪泛
+        * 如果DR fails,那么这个路由器会重传这个更新.
+        */
 
         if (oi->state == ISM_Backup)
         {
@@ -559,6 +577,7 @@ ospf_flood_through_interface (struct ospf_interface *oi,
 /*
  * 在整个area内洪泛lsa
  * @param area 待洪泛lsa的区域
+ * @return 返回1,表示要发送lsack,0则不用
  */
 int
 ospf_flood_through_area (struct ospf_area *area,
@@ -572,6 +591,7 @@ ospf_flood_through_area (struct ospf_area *area,
        eligible interfaces are all those interfaces attaching to the
        Area A.  If Area A is the backbone, this includes all the virtual
        links.  */
+    /* 一个区域可以包含多个网段 */
     for (ALL_LIST_ELEMENTS (area->oiflist, node, nnode, oi)) /* 遍历区域的接口列表 */
     {
         /* 区域不是骨干区域,而且ospf接口是虚链路,就不会进行洪泛
@@ -685,7 +705,7 @@ ospf_flood_through_as (struct ospf *ospf, struct ospf_neighbor *inbr,
 
 /* 洪泛lsa
  * @ospf ospf实例
- * @inbr 邻居
+ * @inbr 邻居(从此邻居处收到lsa)
  * @lsa 待洪泛的lsa
  */
 int
@@ -711,10 +731,12 @@ ospf_flood_through (struct ospf *ospf,
         case OSPF_ASBR_SUMMARY_LSA:
         case OSPF_OPAQUE_LINK_LSA: /* ospf_flood_through_interface ? */
         case OSPF_OPAQUE_AREA_LSA:
+            /* type1,2,3等,只需要洪泛到整个区域 */
             lsa_ack_flag = ospf_flood_through_area (inbr->oi->area, inbr, lsa);
             break;
         case OSPF_AS_EXTERNAL_LSA: /* Type-5 */
         case OSPF_OPAQUE_AS_LSA:
+            /* type-5洪泛到整个自治系统 */
             lsa_ack_flag = ospf_flood_through_as (ospf, inbr, lsa);
             break;
         /* Type-7 Only received within NSSA, then flooded */

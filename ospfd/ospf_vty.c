@@ -837,7 +837,9 @@ ospf_find_vl_data (struct ospf *ospf, struct ospf_vl_config_data *vl_config)
     return vl_data;
 }
 
-
+/* 设置虚链路认证的相关信息
+ * @param vl_config 虚链路配置
+ */
 static int
 ospf_vl_set_security (struct ospf_vl_data *vl_data,
                       struct ospf_vl_config_data *vl_config)
@@ -895,6 +897,7 @@ ospf_vl_set_security (struct ospf_vl_data *vl_data,
     return CMD_SUCCESS;
 }
 
+/* 设置虚链路的相关参数信息 */
 static int
 ospf_vl_set_timers (struct ospf_vl_data *vl_data,
                     struct ospf_vl_config_data *vl_config)
@@ -1516,6 +1519,7 @@ DEFUN (no_ospf_area_shortcut,
 }
 
 
+/* 将一个区域设定为stub区域 */
 DEFUN (ospf_area_stub,
        ospf_area_stub_cmd,
        "area (A.B.C.D|<0-4294967295>) stub",
